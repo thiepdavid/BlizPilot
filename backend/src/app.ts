@@ -23,6 +23,76 @@ app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', service: 'bizpilot-api', dataMode: supabaseConfigured ? 'supabase' : 'local', timestamp: new Date().toISOString() });
 });
 
+const aiRequestTimes = new Map<string, number[]>();
+app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
+  const { message, history } = request.body as { message?: unknown; history?: unknown };
+  if (typeof message !== 'string' || !message.trim() || message.trim().length > 1500) {
+    response.status(400).json({ error: 'Write a question of up to 1,500 characters.' }); return;
+  }
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) { response.status(503).json({ error: 'AI is not configured yet. Add an OpenAI API key to the backend environment.' }); return; }
+
+  const context = (request as AuthenticatedRequest).businessContext;
+  const identity = context?.userId ?? request.ip ?? 'anonymous';
+  const currentTime = Date.now();
+  const recentRequests = (aiRequestTimes.get(identity) ?? []).filter(time => currentTime - time < 60_000);
+  if (recentRequests.length >= 10) { response.status(429).json({ error: 'Please wait a minute before asking another question.' }); return; }
+  aiRequestTimes.set(identity, [...recentRequests, currentTime]);
+
+  const priorTurns = Array.isArray(history) ? history.slice(-6).flatMap((turn: unknown) => {
+    if (!turn || typeof turn !== 'object') return [];
+    const entry = turn as { role?: unknown; content?: unknown };
+    if ((entry.role !== 'user' && entry.role !== 'assistant') || typeof entry.content !== 'string') return [];
+    return [{ role: entry.role, content: entry.content.slice(0, 1500) }];
+  }) : [];
+
+  try {
+    const [customers, appointments, invoices, payments, expenses] = context
+      ? await Promise.all([cloudListCustomers(context), cloudListAppointments(context), cloudListInvoices(context), cloudListPayments(context), cloudListExpenses(context)])
+      : await Promise.all([listCustomers(), listAppointments(), listInvoices(), listPayments(), listExpenses()]);
+    const today = new Date();
+    const todayKey = today.toISOString().slice(0, 10);
+    const day = 86_400_000;
+    const startCurrent = currentTime - 30 * day;
+    const startPrevious = currentTime - 60 * day;
+    const isRecent = (value: string, start: number) => { const time = Date.parse(value); return Number.isFinite(time) && time >= start && time <= currentTime; };
+    const outstanding = invoices.filter(item => item.status !== 'Paid').reduce((sum, item) => sum + Math.max(0, item.amount - (item.paidAmount ?? 0)), 0);
+    const overdue = invoices.filter(item => item.status !== 'Paid' && item.dueDate < todayKey).reduce((sum, item) => sum + Math.max(0, item.amount - (item.paidAmount ?? 0)), 0);
+    const paymentTotal = (start: number) => payments.filter(item => isRecent(item.receivedAt, start)).reduce((sum, item) => sum + item.amount, 0);
+    const expenseTotal = (start: number) => expenses.filter(item => isRecent(item.spentAt, start)).reduce((sum, item) => sum + item.amount, 0);
+    const recentAppointments = appointments.filter(item => isRecent(item.startsAt, startCurrent));
+    const completed = appointments.filter(item => item.status === 'Completed');
+    const repeatCustomers = new Set(completed.reduce<string[]>((ids, item) => [...ids, item.customerId], []).filter((id, index, ids) => ids.indexOf(id) !== index)).size;
+    const snapshot = {
+      period: 'Last 30 days compared with the prior 30 days',
+      customers: { total: customers.length, withMultipleCompletedVisits: repeatCustomers },
+      appointments: { last30Days: recentAppointments.length, completedLast30Days: recentAppointments.filter(item => item.status === 'Completed').length, pendingUpcoming: appointments.filter(item => item.status === 'Pending' && Date.parse(item.startsAt) >= currentTime).length },
+      invoices: { totalOutstandingINR: Math.round(outstanding * 100) / 100, overdueINR: Math.round(overdue * 100) / 100 },
+      paymentsINR: { last30Days: Math.round(paymentTotal(startCurrent) * 100) / 100, prior30Days: Math.round(paymentTotal(startPrevious) * 100) / 100 },
+      expensesINR: { last30Days: Math.round(expenseTotal(startCurrent) * 100) / 100, prior30Days: Math.round(expenseTotal(startPrevious) * 100) / 100 },
+    };
+    const upstream = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna',
+        instructions: 'You are BizPilot, a practical assistant for a small service business in India. Answer using the supplied aggregate business snapshot and conversation only. The snapshot intentionally excludes customer names, contact information, private notes, and individual records. Never claim to have seen those details. If the snapshot lacks information, say so plainly. Use INR for amounts, concise plain language, and give a clear next step when useful. Do not invent metrics or give tax, legal, medical, or investment advice.',
+        input: JSON.stringify({ businessSnapshot: snapshot, recentConversation: priorTurns, question: message.trim() }),
+        max_output_tokens: 500,
+      }),
+    });
+    const result = await upstream.json() as { output_text?: string; output?: Array<{ content?: Array<{ type?: string; text?: string }> }>; error?: { message?: string } };
+    if (!upstream.ok) {
+      console.error('OpenAI response error:', upstream.status, result.error?.message ?? 'unknown error');
+      response.status(502).json({ error: 'The AI service could not answer just now. Please try again.' }); return;
+    }
+    const answer = result.output_text ?? result.output?.flatMap(item => item.content ?? []).filter(item => item.type === 'output_text').map(item => item.text ?? '').join('\n').trim();
+    if (!answer) { response.status(502).json({ error: 'The AI service returned an empty reply. Please try again.' }); return; }
+    response.json({ answer });
+  } catch (error) { next(error); }
+});
+
 app.post('/api/public-booking/page', businessAuth, async (request, response, next) => {
   try {
     const context = (request as AuthenticatedRequest).businessContext;

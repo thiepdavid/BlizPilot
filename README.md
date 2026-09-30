@@ -1,6 +1,6 @@
 # BizPilot
 
-BizPilot is a working SaaS starter for small service businesses. It includes a responsive React dashboard, an Express API, Supabase/PostgreSQL integration with row-level security, and local demo storage. The Daily Brief uses simple rules on saved business records; it does not call an AI service. Payments can be recorded manually or collected through Razorpay Payment Links. The Razorpay connection starts in test mode; WhatsApp and other message delivery are not connected.
+BizPilot is a working SaaS starter for small service businesses. It includes a responsive React dashboard, an Express API, Supabase/PostgreSQL integration with row-level security, and local demo storage. The Daily Brief uses simple rules on saved business records. Ask BizPilot can answer follow-up questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or collected through Razorpay Payment Links. The Razorpay connection starts in test mode; WhatsApp and other message delivery are not connected.
 
 ## Project structure
 
@@ -25,7 +25,7 @@ bizpilot/
 - Expense tracking and month/category reports with CSV export
 - Marketing message drafts that can be edited and copied; BizPilot does not send messages
 - Search across saved business records and dashboard notifications for overdue invoices or pending appointments
-- Daily Brief recommendations calculated from saved records, without an AI integration
+- Daily Brief recommendations calculated from saved records, plus an OpenAI-powered assistant that uses aggregate business totals
 
 ## Requirements
 
@@ -124,3 +124,8 @@ After applying `database/public-booking-closures.sql`, run `database/public-book
 ### Customer notes and service preferences
 
 Before deploying the customer-notes update, run `database/customer-notes.sql` once in the Supabase SQL Editor. It adds a business-private notes field to customer records (up to 2,000 characters). Customer notes are also included in CSV import and export.
+
+
+### Ask BizPilot AI
+
+Add `OPENAI_API_KEY` to the backend environment (local `backend/.env` or Render → `bizpilot-api` → Environment). The key stays on the backend and must never be added to Vercel or a `VITE_` variable. `OPENAI_MODEL` defaults to `gpt-5.6-luna`. Each question sends aggregate business totals and the question to OpenAI; customer names, phone numbers, email addresses, and private notes are excluded. OpenAI API usage may incur charges based on your account and model.
