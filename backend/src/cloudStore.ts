@@ -13,13 +13,13 @@ function invoiceView(row: Row) {
 }
 
 export async function cloudListCustomers(context: BusinessContext) {
-  const data = check(await context.client.from('customers').select('id,business_id,full_name,email,phone,created_at').eq('business_id', context.businessId).order('created_at', { ascending: false }));
-  return data.map((row: Row) => ({ id: row.id, businessId: row.business_id, name: row.full_name, email: row.email ?? '', phone: row.phone ?? '', visits: 0, lastVisit: '—', createdAt: row.created_at }));
+  const data = check(await context.client.from('customers').select('id,business_id,full_name,email,phone,notes,created_at').eq('business_id', context.businessId).order('created_at', { ascending: false }));
+  return data.map((row: Row) => ({ id: row.id, businessId: row.business_id, name: row.full_name, email: row.email ?? '', phone: row.phone ?? '', notes: row.notes ?? '', visits: 0, lastVisit: '—', createdAt: row.created_at }));
 }
 
-export async function cloudCreateCustomer(context: BusinessContext, input: { name: string; email: string; phone: string }) {
-  const data = check(await context.client.from('customers').insert({ business_id: context.businessId, full_name: input.name, email: input.email || null, phone: input.phone || null }).select('id,business_id,full_name,email,phone,created_at').single()) as Row;
-  return { id: data.id, businessId: data.business_id, name: data.full_name, email: data.email ?? '', phone: data.phone ?? '', visits: 0, lastVisit: '—', createdAt: data.created_at };
+export async function cloudCreateCustomer(context: BusinessContext, input: { name: string; email: string; phone: string; notes?: string }) {
+  const data = check(await context.client.from('customers').insert({ business_id: context.businessId, full_name: input.name, email: input.email || null, phone: input.phone || null, notes: input.notes ?? '' }).select('id,business_id,full_name,email,phone,notes,created_at').single()) as Row;
+  return { id: data.id, businessId: data.business_id, name: data.full_name, email: data.email ?? '', phone: data.phone ?? '', notes: data.notes ?? '', visits: 0, lastVisit: '—', createdAt: data.created_at };
 }
 
 export async function cloudListAppointments(context: BusinessContext) {
@@ -103,9 +103,9 @@ export async function cloudUpdateAppointmentSchedule(context: BusinessContext, a
   return { id: data.id, businessId: data.business_id, customerId: data.customer_id, customerName: data.customers?.full_name ?? 'Customer', service: data.service_name ?? 'Service', startsAt: data.starts_at, durationMinutes: data.duration_minutes ?? durationMinutes, status, createdAt: data.created_at };
 }
 
-export async function cloudUpdateCustomer(context: BusinessContext, customerId: string, input: { name: string; email: string; phone: string }) {
-  const data = check(await context.client.from('customers').update({ full_name: input.name, email: input.email || null, phone: input.phone || null, updated_at: new Date().toISOString() }).eq('id', customerId).eq('business_id', context.businessId).select('id,business_id,full_name,email,phone,created_at').single()) as Row;
-  return { id: data.id, businessId: data.business_id, name: data.full_name, email: data.email ?? '', phone: data.phone ?? '', visits: 0, lastVisit: '—', createdAt: data.created_at };
+export async function cloudUpdateCustomer(context: BusinessContext, customerId: string, input: { name: string; email: string; phone: string; notes?: string }) {
+  const data = check(await context.client.from('customers').update({ full_name: input.name, email: input.email || null, phone: input.phone || null, notes: input.notes ?? '', updated_at: new Date().toISOString() }).eq('id', customerId).eq('business_id', context.businessId).select('id,business_id,full_name,email,phone,notes,created_at').single()) as Row;
+  return { id: data.id, businessId: data.business_id, name: data.full_name, email: data.email ?? '', phone: data.phone ?? '', notes: data.notes ?? '', visits: 0, lastVisit: '—', createdAt: data.created_at };
 }
 
 export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string }) {

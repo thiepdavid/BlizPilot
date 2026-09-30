@@ -126,7 +126,7 @@ export default function App() {
     setProfileOverrides(input);
   }
 
-  async function addCustomer(input: { name: string; email: string; phone: string }) {
+  async function addCustomer(input: { name: string; email: string; phone: string; notes?: string }) {
     const response = await fetch(`${apiBase}/api/customers`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this customer.');
@@ -147,7 +147,7 @@ export default function App() {
     setAppointments(current => current.map(item => item.id === id ? decorateAppointment(result) : item));
   }
 
-  async function updateCustomer(id: string, input: { name: string; email: string; phone: string }) {
+  async function updateCustomer(id: string, input: { name: string; email: string; phone: string; notes?: string }) {
     const response = await fetch(`${apiBase}/api/customers/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not update this customer.');

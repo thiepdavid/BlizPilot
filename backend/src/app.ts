@@ -235,19 +235,19 @@ app.get('/api/customers', async (request, response, next) => {
 });
 
 app.patch('/api/customers/:id', async (request, response, next) => {
-  const { name, email, phone } = request.body as { name?: unknown; email?: unknown; phone?: unknown };
-  if (typeof name !== 'string' || name.trim().length < 2 || (email !== undefined && typeof email !== 'string') || (phone !== undefined && typeof phone !== 'string')) {
+  const { name, email, phone, notes } = request.body as { name?: unknown; email?: unknown; phone?: unknown; notes?: unknown };
+  if (typeof name !== 'string' || name.trim().length < 2 || (email !== undefined && typeof email !== 'string') || (phone !== undefined && typeof phone !== 'string') || (notes !== undefined && (typeof notes !== 'string' || notes.length > 2000))) {
     response.status(400).json({ error: 'Enter a customer name and valid contact details.' }); return;
   }
   try {
-    const input = { name: name.trim(), email: typeof email === 'string' ? email.trim() : '', phone: typeof phone === 'string' ? phone.trim() : '' };
+    const input = { name: name.trim(), email: typeof email === 'string' ? email.trim() : '', phone: typeof phone === 'string' ? phone.trim() : '', notes: typeof notes === 'string' ? notes.trim() : '' };
     const cloud = (request as AuthenticatedRequest).businessContext;
     response.json(cloud ? await cloudUpdateCustomer(cloud, request.params.id, input) : await updateCustomer(request.params.id, input));
   } catch (error) { next(error); }
 });
 
 app.post('/api/customers', async (request, response, next) => {
-  const { name, email, phone } = request.body as { name?: unknown; email?: unknown; phone?: unknown };
+  const { name, email, phone, notes } = request.body as { name?: unknown; email?: unknown; phone?: unknown; notes?: unknown };
   if (typeof name !== 'string' || name.trim().length < 2) {
     response.status(400).json({ error: 'Enter a customer name with at least 2 characters.' });
     return;
@@ -260,10 +260,14 @@ app.post('/api/customers', async (request, response, next) => {
     response.status(400).json({ error: 'Phone must be text.' });
     return;
   }
+  if (notes !== undefined && (typeof notes !== 'string' || notes.length > 2000)) {
+    response.status(400).json({ error: 'Notes must be 2,000 characters or fewer.' }); return;
+  }
   try {
     const cloud = (request as AuthenticatedRequest).businessContext;
-    if (cloud) { response.status(201).json(await cloudCreateCustomer(cloud, { name: name.trim(), email: typeof email === 'string' ? email.trim() : '', phone: typeof phone === 'string' ? phone.trim() : '' })); return; }
-    const customer = await createCustomer({ name: name.trim(), email: typeof email === 'string' ? email.trim() : '', phone: typeof phone === 'string' ? phone.trim() : '' });
+    const input = { name: name.trim(), email: typeof email === 'string' ? email.trim() : '', phone: typeof phone === 'string' ? phone.trim() : '', notes: typeof notes === 'string' ? notes.trim() : '' };
+    if (cloud) { response.status(201).json(await cloudCreateCustomer(cloud, input)); return; }
+    const customer = await createCustomer(input);
     response.status(201).json(customer);
   } catch (error) {
     next(error);

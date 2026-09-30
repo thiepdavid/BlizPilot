@@ -119,3 +119,8 @@ After applying `database/public-booking-hours.sql`, run `database/public-booking
 ### Hide already-booked appointment times
 
 After applying `database/public-booking-closures.sql`, run `database/public-booking-availability.sql` in the Supabase SQL Editor. The public form checks existing bookings for the selected date and only displays non-overlapping times; customer details are never returned by this availability lookup.
+
+
+### Customer notes and service preferences
+
+Before deploying the customer-notes update, run `database/customer-notes.sql` once in the Supabase SQL Editor. It adds a business-private notes field to customer records (up to 2,000 characters). Customer notes are also included in CSV import and export.
