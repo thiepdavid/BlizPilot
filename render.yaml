@@ -15,4 +15,4 @@ services:
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: CORS_ORIGIN
-        value: http://localhost:5173
+        value: https://blizpilot-alpha.vercel.app
