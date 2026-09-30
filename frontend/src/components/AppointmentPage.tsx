@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CalendarDays, Check, Clock3, Copy, Link2, Pencil, Plus, Search, X } from 'lucide-react';
+import { CalendarDays, Check, Clock3, Copy, Link2, MessageCircle, Pencil, Plus, Search, X } from 'lucide-react';
 import type { Appointment, Customer, Service } from '../types';
 import './appointments.css';
 
@@ -15,7 +15,8 @@ type AppointmentInput = { customerId: string; service: string; startsAt: string;
 type BusinessHours = Record<string, { closed: boolean; open: string; close: string }>;
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const defaultHours: BusinessHours = Object.fromEntries(weekdayNames.map((_, day) => [String(day), { closed: day === 0, open: '09:00', close: '18:00' }]));
-export function AppointmentPage({ customers, appointments, services, onCreate, onStatusChange, onReschedule, onGetBookingPage, onGetBookingHours, onSaveBookingHours, onGetClosedDates, onSaveClosedDates, prefillCustomerId, onPrefillHandled }: {
+export function AppointmentPage({ businessName, customers, appointments, services, onCreate, onStatusChange, onReschedule, onGetBookingPage, onGetBookingHours, onSaveBookingHours, onGetClosedDates, onSaveClosedDates, prefillCustomerId, onPrefillHandled }: {
+  businessName: string;
   customers: Customer[];
   appointments: Appointment[];
   services: Service[];
@@ -101,6 +102,24 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
     finally { setUpdatingId(''); }
   }
 
+  function whatsappUrl(item: Appointment) {
+    const phone = customers.find(customer => customer.id === item.customerId)?.phone?.replace(/\D/g, '') ?? '';
+    const internationalPhone = phone.length === 10 ? `91${phone}` : phone.startsWith('0') && phone.length === 11 ? `91${phone.slice(1)}` : phone;
+    if (internationalPhone.length < 10) return '';
+    const when = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(item.startsAt));
+    const greeting = item.status === 'Confirmed'
+      ? `Your appointment for ${item.service} is confirmed for ${when}.`
+      : item.status === 'Pending'
+        ? `We received your request for ${item.service} on ${when}. We’ll contact you to confirm.`
+        : item.status === 'Cancelled'
+          ? `Your appointment for ${item.service} on ${when} has been cancelled. Please contact us if you need to rebook.`
+          : item.status === 'Completed'
+            ? `Thank you for visiting us for ${item.service}. We hope to see you again soon!`
+            : `We missed you for your ${item.service} appointment on ${when}. Contact us if you’d like to book another time.`;
+    const message = `Hi ${item.customer}, ${greeting} — ${businessName}`;
+    return `https://wa.me/${internationalPhone}?text=${encodeURIComponent(message)}`;
+  }
+
   async function shareBookingPage() {
     setBookingPageSaving(true); setBookingPageError('');
     try {
@@ -160,7 +179,7 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
       {sorted.map(item => <div className="table-row appointment-table" key={item.id}>
         <div className="appointment-date"><strong>{new Date(item.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</strong><span>{new Date(item.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
         <div className="table-customer"><div className={`person-avatar ${item.tone}`}>{item.initials}</div><span><strong>{item.customer}</strong><small>{item.service} · {item.durationMinutes} min</small></span></div>
-        <div className="appointment-actions"><select className={`status-select status ${item.status.toLowerCase().replace(' ', '-')}`} aria-label={`Status for ${item.customer}`} value={item.status} disabled={updatingId === item.id} onChange={event => void changeStatus(item, event.target.value as Appointment['status'])}><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option><option>No show</option></select><button type="button" className="reschedule-button" onClick={() => { setScheduleError(''); setRescheduleItem(item); }} aria-label={`Reschedule ${item.customer}`} title="Reschedule"><Pencil size={13}/></button></div>
+        <div className="appointment-actions"><select className={`status-select status ${item.status.toLowerCase().replace(' ', '-')}`} aria-label={`Status for ${item.customer}`} value={item.status} disabled={updatingId === item.id} onChange={event => void changeStatus(item, event.target.value as Appointment['status'])}><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option><option>No show</option></select>{whatsappUrl(item) ? <a className="whatsapp-button" href={whatsappUrl(item)} target="_blank" rel="noreferrer" aria-label={`Open WhatsApp message to ${item.customer}`} title="Draft a WhatsApp message"><MessageCircle size={13}/></a> : <button type="button" className="whatsapp-button" disabled title="Add a phone number to this customer to use WhatsApp" aria-label={`No phone number for ${item.customer}`}><MessageCircle size={13}/></button>}<button type="button" className="reschedule-button" onClick={() => { setScheduleError(''); setRescheduleItem(item); }} aria-label={`Reschedule ${item.customer}`} title="Reschedule"><Pencil size={13}/></button></div>
       </div>)}
       {sorted.length === 0 && <div className="empty-state">{appointments.length === 0 ? 'No appointments yet. Add one to get started.' : 'No appointments match these filters.'}</div>}
     </section>
