@@ -19,6 +19,7 @@ bizpilot/
 - Customer records, customer profiles, CSV import/export, and customer-specific appointment/invoice actions
 - Service catalog with add, edit, and archive actions
 - Appointment booking, search, date/status filters, status updates, rescheduling, and overlap checks
+- Shareable public booking page; customer requests arrive as pending appointments for owner confirmation
 - Invoice creation with optional GST, invoice preview/print, outstanding balances, and overdue filters
 - Manual payment recording, invoice payment links through Razorpay, webhook-confirmed online payments, and copy-only reminders
 - Expense tracking and month/category reports with CSV export
@@ -102,3 +103,7 @@ The Render Blueprint initially allows the local development origin. Update `CORS
 5. Save Render environment changes and redeploy the API. In BizPilot, open **Payments → Create pay link** for an unpaid invoice, then share the copied Razorpay URL with your customer. After the test payment, Razorpay's signed webhook adds the payment and updates the invoice balance.
 
 For local development, put the same test values in `backend/.env` and configure Razorpay webhook delivery to reach your local API through a secure webhook-forwarding tool. Payment links require a signed-in Supabase account and an invoice stored in Supabase. Test mode simulates payment; it does not transfer real money. Live charges require Razorpay approval, live API keys, and successful end-to-end testing.
+
+## Public appointment booking
+
+Apply `database/public-booking.sql` once in Supabase SQL Editor. After deploying the changes, open **Appointments → Share booking page** and send the link to customers. They can choose an active service and request a time within the next 90 days; requests are added as **Pending** and block overlapping bookings until you confirm, reschedule, or cancel them. The public form asks for a phone number or email so the business can follow up. No Razorpay setup is needed.

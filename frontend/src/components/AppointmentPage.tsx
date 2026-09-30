@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { CalendarDays, Clock3, Pencil, Plus, Search, X } from 'lucide-react';
+import { CalendarDays, Check, Clock3, Copy, Link2, Pencil, Plus, Search, X } from 'lucide-react';
 import type { Appointment, Customer, Service } from '../types';
 import './appointments.css';
 
@@ -12,13 +12,14 @@ function asLocalDateTime(value: string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 type AppointmentInput = { customerId: string; service: string; startsAt: string; durationMinutes: number };
-export function AppointmentPage({ customers, appointments, services, onCreate, onStatusChange, onReschedule, prefillCustomerId, onPrefillHandled }: {
+export function AppointmentPage({ customers, appointments, services, onCreate, onStatusChange, onReschedule, onGetBookingPage, prefillCustomerId, onPrefillHandled }: {
   customers: Customer[];
   appointments: Appointment[];
   services: Service[];
   onCreate: (input: AppointmentInput) => Promise<void>;
   onStatusChange: (id: string, status: Appointment['status']) => Promise<void>;
   onReschedule: (id: string, startsAt: string, durationMinutes: number) => Promise<void>;
+  onGetBookingPage: () => Promise<string>;
   prefillCustomerId?: string | null;
   onPrefillHandled: () => void;
 }) {
@@ -35,6 +36,10 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
   const [statusError, setStatusError] = useState('');
   const [rescheduleItem, setRescheduleItem] = useState<Appointment | null>(null);
   const [scheduleError, setScheduleError] = useState('');
+  const [bookingUrl, setBookingUrl] = useState('');
+  const [bookingPageError, setBookingPageError] = useState('');
+  const [bookingPageSaving, setBookingPageSaving] = useState(false);
+  const [bookingUrlCopied, setBookingUrlCopied] = useState(false);
   useEffect(() => { if (prefillCustomerId) { setSelectedCustomerId(prefillCustomerId); setFormOpen(true); onPrefillHandled(); } }, [prefillCustomerId, onPrefillHandled]);
   const sorted = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -77,8 +82,22 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
     finally { setUpdatingId(''); }
   }
 
+  async function shareBookingPage() {
+    setBookingPageSaving(true); setBookingPageError('');
+    try {
+      const slug = await onGetBookingPage();
+      const url = `${window.location.origin}/book/${encodeURIComponent(slug)}`;
+      setBookingUrl(url);
+      try { await navigator.clipboard.writeText(url); setBookingUrlCopied(true); window.setTimeout(() => setBookingUrlCopied(false), 2200); }
+      catch { setBookingUrlCopied(false); }
+    } catch (reason) { setBookingPageError(reason instanceof Error ? reason.message : 'Could not create your booking page.'); }
+    finally { setBookingPageSaving(false); }
+  }
+
   return <>
-    <div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> APPOINTMENTS</div><h1>Appointments</h1><p>Keep your day running smoothly.</p></div><button className="primary-button" onClick={() => { setError(''); setFormOpen(true); }}><Plus size={17}/>New appointment</button></div>
+    <div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> APPOINTMENTS</div><h1>Appointments</h1><p>Keep your day running smoothly.</p></div><div className="appointment-page-actions"><button className="secondary-button" disabled={bookingPageSaving} onClick={() => void shareBookingPage()}><Link2 size={15}/>{bookingPageSaving ? 'Creating…' : 'Share booking page'}</button><button className="primary-button" onClick={() => { setError(''); setFormOpen(true); }}><Plus size={17}/>New appointment</button></div></div>
+    {bookingUrl && <div className="panel booking-share-panel"><div><strong>Your booking page</strong><span>Customers can request a time; it appears as Pending until you confirm it.</span><a href={bookingUrl} target="_blank" rel="noreferrer">{bookingUrl}</a></div><button className="secondary-button" onClick={async () => { try { await navigator.clipboard.writeText(bookingUrl); setBookingUrlCopied(true); window.setTimeout(() => setBookingUrlCopied(false), 2200); } catch { setBookingPageError('Could not copy the link. Select and copy it above.'); } }}>{bookingUrlCopied ? <Check size={14}/> : <Copy size={14}/>} {bookingUrlCopied ? 'Copied' : 'Copy link'}</button></div>}
+    {bookingPageError && <p className="form-error status-error" role="alert">{bookingPageError}</p>}
     <section className="panel section-table">
       <div className="table-toolbar appointment-toolbar"><div className="search-field"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search appointments" aria-label="Search appointments"/></div><div className="appointment-filter-group"><label><span>Date</span><select className="appointment-filter" value={dateFilter} onChange={event => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">All dates</option><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="past">Past</option></select></label><label><span>Status</span><select className="appointment-filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)}><option>All statuses</option><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option><option>No show</option></select></label></div><span>{sorted.length} appointments</span></div>
       <div className="table-header appointment-table"><span>TIME</span><span>CUSTOMER & SERVICE</span><span>STATUS & ACTIONS</span></div>

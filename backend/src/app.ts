@@ -10,15 +10,48 @@ import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from '.
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
+import { createPublicBookingRequest, ensurePublicBookingPage, getPublicBookingPage, publicBookingRateLimit } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
 
 export const app = express();
+app.set('trust proxy', 1);
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173' }));
 app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', service: 'bizpilot-api', dataMode: supabaseConfigured ? 'supabase' : 'local', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/public-booking/page', businessAuth, async (request, response, next) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Public booking pages require a signed-in Supabase business.' }); return; }
+    response.json({ slug: await ensurePublicBookingPage(context) });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/public-booking/:slug', async (request, response, next) => {
+  try {
+    const page = await getPublicBookingPage(request.params.slug);
+    if (!page) { response.status(404).json({ error: 'This booking page is not available.' }); return; }
+    response.json(page);
+  } catch (error) { next(error); }
+});
+
+app.post('/api/public-booking/:slug/request', publicBookingRateLimit, async (request, response, next) => {
+  const { name, phone, email, serviceId, startsAt } = request.body as { name?: unknown; phone?: unknown; email?: unknown; serviceId?: unknown; startsAt?: unknown };
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100 || (typeof phone !== 'string' && phone !== undefined) || (typeof email !== 'string' && email !== undefined) || (!String(phone ?? '').trim() && !String(email ?? '').trim()) || typeof serviceId !== 'string' || !/^[0-9a-f-]{36}$/i.test(serviceId) || typeof startsAt !== 'string' || Number.isNaN(Date.parse(startsAt))) {
+    response.status(400).json({ error: 'Enter your name, a phone number or email, a service, and a valid date and time.' }); return;
+  }
+  try {
+    const appointment = await createPublicBookingRequest(request.params.slug, { name: name.trim(), phone: typeof phone === 'string' ? phone.trim() : '', email: typeof email === 'string' ? email.trim() : '', serviceId, startsAt: new Date(startsAt).toISOString() });
+    response.status(201).json(appointment);
+  } catch (error) {
+    if (error instanceof Error && (error.message.includes('no longer available') || error.message.includes('Choose a date'))) { response.status(409).json({ error: error.message }); return; }
+    if (error instanceof Error && (error.message.includes('Enter your name') || error.message.includes('Enter a valid') || error.message.includes('available service') || error.message.includes('booking page is not available'))) { response.status(400).json({ error: error.message }); return; }
+    next(error);
+  }
 });
 
 app.use('/api/campaigns', businessAuth);
