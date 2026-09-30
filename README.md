@@ -115,3 +115,7 @@ After applying `database/public-booking.sql`, run `database/public-booking-hours
 ### Block one-off dates
 
 After applying `database/public-booking-hours.sql`, run `database/public-booking-closures.sql` in the Supabase SQL Editor. Under **Appointments → Share booking page → Manage hours**, add and save holiday or time-off dates. The public booking page will show those dates as closed and the API will reject requests for them.
+
+### Hide already-booked appointment times
+
+After applying `database/public-booking-closures.sql`, run `database/public-booking-availability.sql` in the Supabase SQL Editor. The public form checks existing bookings for the selected date and only displays non-overlapping times; customer details are never returned by this availability lookup.

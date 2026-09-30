@@ -10,7 +10,7 @@ import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from '.
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
-import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours } from './publicBooking.js';
+import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
 
 export const app = express();
@@ -82,6 +82,21 @@ app.get('/api/public-booking/:slug', async (request, response, next) => {
     if (!page) { response.status(404).json({ error: 'This booking page is not available.' }); return; }
     response.json(page);
   } catch (error) { next(error); }
+});
+
+app.get('/api/public-booking/:slug/busy-times', async (request, response, next) => {
+  const date = request.query.date;
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
+    response.status(400).json({ error: 'Choose a valid date.' }); return;
+  }
+  try { response.json({ busyTimes: await getPublicBookingBusyTimes(request.params.slug, date) }); }
+  catch (error) {
+    if (error instanceof Error && (error.message.includes('not available') || error.message.includes('within the next 90 days'))) {
+      response.status(400).json({ error: error.message }); return;
+    }
+    next(error);
+  }
 });
 
 app.post('/api/public-booking/:slug/request', publicBookingRateLimit, async (request, response, next) => {

@@ -18,7 +18,7 @@ function dateInDays(date: string, days: number) {
   return result.toISOString().slice(0, 10);
 }
 
-function timeOptions(date: string, hours: Record<string, DayHours>, closedDates: string[], durationMinutes: number, timeZone: string) {
+function timeOptions(date: string, hours: Record<string, DayHours>, closedDates: string[], busyTimes: Array<{ startsAt: string; endsAt: string }>, durationMinutes: number, timeZone: string) {
   if (!date) return [];
   if (closedDates.includes(date)) return [];
   const dayNumber = new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -31,7 +31,10 @@ function timeOptions(date: string, hours: Record<string, DayHours>, closedDates:
   const options: string[] = [];
   for (let minute = start; minute + durationMinutes <= close; minute += 15) {
     const time = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-    if (date !== currentDateInZone(timeZone) || new Date(zonedDateTimeToIso(date, time, timeZone)).getTime() > Date.now()) options.push(time);
+    const slotStart = new Date(zonedDateTimeToIso(date, time, timeZone)).getTime();
+    const slotEnd = slotStart + durationMinutes * 60_000;
+    const overlaps = busyTimes.some(busy => slotStart < new Date(busy.endsAt).getTime() && slotEnd > new Date(busy.startsAt).getTime());
+    if (!overlaps && (date !== currentDateInZone(timeZone) || slotStart > Date.now())) options.push(time);
   }
   return options;
 }
@@ -56,6 +59,9 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
   const [serviceId, setServiceId] = useState('');
   const [requestedDate, setRequestedDate] = useState('');
   const [requestedTime, setRequestedTime] = useState('');
+  const [busyTimes, setBusyTimes] = useState<Array<{ startsAt: string; endsAt: string }>>([]);
+  const [busyLoading, setBusyLoading] = useState(false);
+  const [busyError, setBusyError] = useState('');
 
   useEffect(() => {
     let current = true;
@@ -71,8 +77,24 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
     return () => { current = false; };
   }, [apiBase, slug]);
 
+  useEffect(() => {
+    if (!page || !requestedDate) return;
+    let current = true;
+    setBusyLoading(true); setBusyError(''); setRequestedTime('');
+    fetch(`${apiBase}/api/public-booking/${encodeURIComponent(slug)}/busy-times?date=${encodeURIComponent(requestedDate)}`)
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error ?? 'Could not check appointment availability.');
+        return result as { busyTimes: Array<{ startsAt: string; endsAt: string }> };
+      })
+      .then(result => { if (current) setBusyTimes(result.busyTimes); })
+      .catch(reason => { if (current) { setBusyTimes([]); setBusyError(reason instanceof Error ? reason.message : 'Could not check appointment availability.'); } })
+      .finally(() => { if (current) setBusyLoading(false); });
+    return () => { current = false; };
+  }, [apiBase, slug, requestedDate, page?.timezone]);
+
   const chosenService = page?.services.find(item => item.id === serviceId);
-  const slots = page && chosenService ? timeOptions(requestedDate, page.hours, page.closedDates ?? [], chosenService.durationMinutes, page.timezone || 'Asia/Kolkata') : [];
+  const slots = page && chosenService && !busyLoading && !busyError ? timeOptions(requestedDate, page.hours, page.closedDates ?? [], busyTimes, chosenService.durationMinutes, page.timezone || 'Asia/Kolkata') : [];
   const dateClosed = Boolean(page && (page.closedDates ?? []).includes(requestedDate));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -107,7 +129,8 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
         <label>Your name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Full name"/></label>
         <div className="public-contact-grid"><label>Phone<input name="phone" type="tel" maxLength={40} autoComplete="tel" placeholder="Phone number"/></label><label>Email<input name="email" type="email" maxLength={254} autoComplete="email" placeholder="Email address"/></label></div>
         <p className="public-contact-help">Please provide a phone number or email so the business can confirm.</p>
-        <div className="public-booking-time-grid"><label>Date<span className="public-date-icon"><CalendarDays size={14}/></span><input name="date" type="date" value={requestedDate} min={today} max={lastDate} onChange={event => { setRequestedDate(event.target.value); setRequestedTime(''); }} required/></label><label>Available time<span className="public-date-icon"><Clock3 size={14}/></span><select name="time" value={requestedTime} onChange={event => setRequestedTime(event.target.value)} required disabled={!slots.length}><option value="">{slots.length ? 'Choose a time' : dateClosed ? 'Closed on this date' : 'No times available'}</option>{slots.map(time => <option key={time} value={time}>{time}</option>)}</select></label></div>
+        <div className="public-booking-time-grid"><label>Date<span className="public-date-icon"><CalendarDays size={14}/></span><input name="date" type="date" value={requestedDate} min={today} max={lastDate} onChange={event => { setRequestedDate(event.target.value); setRequestedTime(''); }} required/></label><label>Available time<span className="public-date-icon"><Clock3 size={14}/></span><select name="time" value={requestedTime} onChange={event => setRequestedTime(event.target.value)} required disabled={!slots.length}><option value="">{busyLoading ? 'Checking availability…' : busyError ? 'Availability unavailable' : slots.length ? 'Choose a time' : dateClosed ? 'Closed on this date' : 'No times available'}</option>{slots.map(time => <option key={time} value={time}>{time}</option>)}</select></label></div>
+        {busyError && <p className="public-booking-error" role="alert">{busyError} Please choose another date or try again.</p>}
         {dateClosed && <p className="public-closed-date-note">This business is closed on the selected date. Please choose another day.</p>}
         <p className="public-contact-help">Times shown in {page.timezone}. Requests are pending until the business confirms.</p>
         {error && <p className="public-booking-error" role="alert">{error}</p>}

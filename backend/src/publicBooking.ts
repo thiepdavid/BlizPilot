@@ -50,6 +50,12 @@ export async function getPublicBookingPage(slug: string) {
   return data;
 }
 
+export async function getPublicBookingBusyTimes(slug: string, date: string) {
+  const { data, error } = await anonymousClient().rpc('get_public_booking_busy_times', { target_slug: slug, target_date: date });
+  if (error) throw new Error(error.message);
+  return data as Array<{ startsAt: string; endsAt: string }>;
+}
+
 export async function createPublicBookingRequest(slug: string, input: { name: string; phone: string; email: string; serviceId: string; startsAt: string }) {
   const { data, error } = await anonymousClient().rpc('request_public_booking', {
     target_slug: slug,
