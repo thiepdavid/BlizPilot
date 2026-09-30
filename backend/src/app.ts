@@ -9,10 +9,12 @@ import { createExpense, listExpenses } from './expenses.js';
 import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from './campaigns.js';
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
+import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
 
 export const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173' }));
+app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
 app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
@@ -267,6 +269,33 @@ app.use('/api/payments', businessAuth);
 app.get('/api/payments', async (request, response, next) => {
   try { const cloud = (request as AuthenticatedRequest).businessContext; response.json(cloud ? await cloudListPayments(cloud) : await listPayments()); }
   catch (error) { next(error); }
+});
+
+app.post('/api/payments/link', async (request, response, next) => {
+  const { invoiceId } = request.body as { invoiceId?: unknown };
+  if (typeof invoiceId !== 'string' || !invoiceId) {
+    response.status(400).json({ error: 'Choose an invoice to create a payment link.' });
+    return;
+  }
+  const cloud = (request as AuthenticatedRequest).businessContext;
+  if (!cloud) {
+    response.status(400).json({ error: 'Online payment links require your signed-in Supabase business account.' });
+    return;
+  }
+  try {
+    const paymentLink = await createRazorpayPaymentLink(cloud, invoiceId);
+    response.status(201).json(paymentLink);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('not configured yet')) {
+      response.status(503).json({ error: error.message });
+      return;
+    }
+    if (error instanceof Error && (error.message.includes('invoice') || error.message.includes('balance'))) {
+      response.status(400).json({ error: error.message });
+      return;
+    }
+    next(error);
+  }
 });
 
 app.post('/api/payments', async (request, response, next) => {

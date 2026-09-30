@@ -14,5 +14,13 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
       - key: CORS_ORIGIN
         value: https://blizpilot-alpha.vercel.app

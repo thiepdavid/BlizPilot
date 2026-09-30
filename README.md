@@ -1,6 +1,6 @@
 # BizPilot
 
-BizPilot is a working SaaS starter for small service businesses. It includes a responsive React dashboard, an Express API, Supabase/PostgreSQL integration with row-level security, and local demo storage. The Daily Brief uses simple rules on saved business records; it does not call an AI service. Payment recording only updates BizPilot records and does not move money. WhatsApp and other message delivery are not connected.
+BizPilot is a working SaaS starter for small service businesses. It includes a responsive React dashboard, an Express API, Supabase/PostgreSQL integration with row-level security, and local demo storage. The Daily Brief uses simple rules on saved business records; it does not call an AI service. Payments can be recorded manually or collected through Razorpay Payment Links. The Razorpay connection starts in test mode; WhatsApp and other message delivery are not connected.
 
 ## Project structure
 
@@ -20,7 +20,7 @@ bizpilot/
 - Service catalog with add, edit, and archive actions
 - Appointment booking, search, date/status filters, status updates, rescheduling, and overlap checks
 - Invoice creation with optional GST, invoice preview/print, outstanding balances, and overdue filters
-- Manual payment recording, partial payments, and copy-only payment reminders
+- Manual payment recording, invoice payment links through Razorpay, webhook-confirmed online payments, and copy-only reminders
 - Expense tracking and month/category reports with CSV export
 - Marketing message drafts that can be edited and copied; BizPilot does not send messages
 - Search across saved business records and dashboard notifications for overdue invoices or pending appointments
@@ -60,7 +60,7 @@ Use the same Supabase project URL and key in both apps:
 - `frontend/.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - `backend/.env`: `SUPABASE_URL`, `SUPABASE_ANON_KEY`
 
-The `VITE_API_URL` setting is optional for local development. `PORT` and `CORS_ORIGIN` configure the API. `DATABASE_URL` is not used by this starter; cloud access uses the Supabase API and RLS. Never put a Supabase service-role key in either app.
+The `VITE_API_URL` setting is optional for local development. `PORT` and `CORS_ORIGIN` configure the API. `DATABASE_URL` is not used by this starter; cloud access uses the Supabase API and RLS. Never put a Supabase service-role key in either app or the frontend.
 
 Local JSON records are not automatically copied into Supabase. Configure both apps for Supabase before creating records you want stored in the cloud.
 
@@ -78,7 +78,7 @@ npm run build
 - Push the project to a Git provider and connect it to Vercel and Render.
 - Enter your production Supabase values and deployment URLs in the hosting dashboards.
 - Apply and verify the schema in the production Supabase project.
-- Add a real payment processor or messaging provider only if those integrations become part of the product scope.
+- Set up Razorpay and its test credentials to try online payments; switch to live credentials only after the Razorpay account is approved and the payment flow has been tested.
 
 
 ## Deployment starter (Vercel + Render)
@@ -91,4 +91,14 @@ The repository includes `vercel.json` for the Vite frontend and `render.yaml` fo
 4. In Render, update `CORS_ORIGIN` to the exact Vercel site origin (for example, `https://bizpilot.vercel.app`, with no trailing slash), then redeploy the API.
 5. In Supabase Authentication URL Configuration, set the production Site URL and allowed redirect URL to your Vercel domain.
 
-The Render Blueprint initially allows the local development origin. Update `CORS_ORIGIN` after the frontend has a deployment URL. Set cloud storage in both apps before using production data; local JSON storage is not suitable for hosted persistence. Vite environment values are embedded into the frontend at build time, so redeploy Vercel after changing them. Keep service-role credentials out of Vercel and Render.
+The Render Blueprint initially allows the local development origin. Update `CORS_ORIGIN` after the frontend has a deployment URL. Set cloud storage in both apps before using production data; local JSON storage is not suitable for hosted persistence. Vite environment values are embedded into the frontend at build time, so redeploy Vercel after changing them. Keep service-role credentials out of Vercel and store them only as private Render environment variables.
+
+## Razorpay payment links (test mode first)
+
+1. In Supabase SQL Editor, run `database/razorpay-payments.sql`. This adds an idempotency table and a server-only function so verified payment webhooks update the right invoice once.
+2. In Razorpay, activate a merchant account if prompted, then create **Test Mode** API keys. Never paste secret keys into chat or the frontend.
+3. In Render → `bizpilot-api` → **Environment**, add `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY`. The service-role key is available in your Supabase project API settings. Keep all three only on the backend.
+4. In Razorpay Dashboard → **Account & Settings → Webhooks**, add `https://bizpilot-api-t8bl.onrender.com/api/payments/razorpay/webhook`, choose the `payment_link.paid` event, and set a webhook secret. Add that same secret to Render as `RAZORPAY_WEBHOOK_SECRET`.
+5. Save Render environment changes and redeploy the API. In BizPilot, open **Payments → Create pay link** for an unpaid invoice, then share the copied Razorpay URL with your customer. After the test payment, Razorpay's signed webhook adds the payment and updates the invoice balance.
+
+For local development, put the same test values in `backend/.env` and configure Razorpay webhook delivery to reach your local API through a secure webhook-forwarding tool. Payment links require a signed-in Supabase account and an invoice stored in Supabase. Test mode simulates payment; it does not transfer real money. Live charges require Razorpay approval, live API keys, and successful end-to-end testing.
