@@ -19,6 +19,18 @@ export async function ensurePublicBookingPage(context: BusinessContext) {
   return String(data);
 }
 
+export async function getBusinessBookingHours(context: BusinessContext) {
+  const { data, error } = await context.client.rpc('get_business_booking_hours', { target_business_id: context.businessId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function saveBusinessBookingHours(context: BusinessContext, hours: Record<string, unknown>) {
+  const { data, error } = await context.client.rpc('save_business_booking_hours', { target_business_id: context.businessId, target_hours: hours });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function getPublicBookingPage(slug: string) {
   const { data, error } = await anonymousClient().rpc('get_public_booking_page', { target_slug: slug });
   if (error) throw new Error(error.message);

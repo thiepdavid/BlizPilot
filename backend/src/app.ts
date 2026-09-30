@@ -10,7 +10,7 @@ import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from '.
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
-import { createPublicBookingRequest, ensurePublicBookingPage, getPublicBookingPage, publicBookingRateLimit } from './publicBooking.js';
+import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingHours, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingHours } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
 
 export const app = express();
@@ -28,6 +28,29 @@ app.post('/api/public-booking/page', businessAuth, async (request, response, nex
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Public booking pages require a signed-in Supabase business.' }); return; }
     response.json({ slug: await ensurePublicBookingPage(context) });
+  } catch (error) { next(error); }
+});
+
+app.get('/api/public-booking/hours', businessAuth, async (request, response, next) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Business hours require a signed-in Supabase business.' }); return; }
+    response.json(await getBusinessBookingHours(context));
+  } catch (error) { next(error); }
+});
+
+app.patch('/api/public-booking/hours', businessAuth, async (request, response, next) => {
+  const hours = request.body?.hours as Record<string, { closed?: unknown; open?: unknown; close?: unknown }> | undefined;
+  const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+  const valid = hours && typeof hours === 'object' && !Array.isArray(hours)
+    && Array.from({ length: 7 }, (_, day) => hours[String(day)]).every(value => value && typeof value === 'object'
+      && typeof value.closed === 'boolean'
+      && (value.closed || (typeof value.open === 'string' && timePattern.test(value.open) && typeof value.close === 'string' && timePattern.test(value.close) && value.close > value.open)));
+  if (!valid) { response.status(400).json({ error: 'Set each day to closed or choose valid opening and closing times.' }); return; }
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Business hours require a signed-in Supabase business.' }); return; }
+    response.json(await saveBusinessBookingHours(context, hours as Record<string, unknown>));
   } catch (error) { next(error); }
 });
 

@@ -107,3 +107,7 @@ For local development, put the same test values in `backend/.env` and configure 
 ## Public appointment booking
 
 Apply `database/public-booking.sql` once in Supabase SQL Editor. After deploying the changes, open **Appointments → Share booking page** and send the link to customers. They can choose an active service and request a time within the next 90 days; requests are added as **Pending** and block overlapping bookings until you confirm, reschedule, or cancel them. The public form asks for a phone number or email so the business can follow up. No Razorpay setup is needed.
+
+### Set public booking hours
+
+After applying `database/public-booking.sql`, run `database/public-booking-hours.sql` in the Supabase SQL Editor. In BizPilot, open **Appointments → Share booking page → Manage hours** to set open days and times. Customers will only be offered available 15-minute start times within those hours, using the business time zone. The default schedule is Monday through Saturday, 9:00 AM–6:00 PM, with Sunday closed.

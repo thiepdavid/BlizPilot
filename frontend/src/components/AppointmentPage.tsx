@@ -12,7 +12,10 @@ function asLocalDateTime(value: string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 type AppointmentInput = { customerId: string; service: string; startsAt: string; durationMinutes: number };
-export function AppointmentPage({ customers, appointments, services, onCreate, onStatusChange, onReschedule, onGetBookingPage, prefillCustomerId, onPrefillHandled }: {
+type BusinessHours = Record<string, { closed: boolean; open: string; close: string }>;
+const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const defaultHours: BusinessHours = Object.fromEntries(weekdayNames.map((_, day) => [String(day), { closed: day === 0, open: '09:00', close: '18:00' }]));
+export function AppointmentPage({ customers, appointments, services, onCreate, onStatusChange, onReschedule, onGetBookingPage, onGetBookingHours, onSaveBookingHours, prefillCustomerId, onPrefillHandled }: {
   customers: Customer[];
   appointments: Appointment[];
   services: Service[];
@@ -20,6 +23,8 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
   onStatusChange: (id: string, status: Appointment['status']) => Promise<void>;
   onReschedule: (id: string, startsAt: string, durationMinutes: number) => Promise<void>;
   onGetBookingPage: () => Promise<string>;
+  onGetBookingHours: () => Promise<{ timezone: string; hours: Record<string, { closed?: boolean; open?: string; close?: string }> }>;
+  onSaveBookingHours: (hours: BusinessHours) => Promise<void>;
   prefillCustomerId?: string | null;
   onPrefillHandled: () => void;
 }) {
@@ -40,6 +45,13 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
   const [bookingPageError, setBookingPageError] = useState('');
   const [bookingPageSaving, setBookingPageSaving] = useState(false);
   const [bookingUrlCopied, setBookingUrlCopied] = useState(false);
+  const [hoursOpen, setHoursOpen] = useState(false);
+  const [hours, setHours] = useState<BusinessHours>(defaultHours);
+  const [hoursTimezone, setHoursTimezone] = useState('Asia/Kolkata');
+  const [hoursLoading, setHoursLoading] = useState(false);
+  const [hoursSaving, setHoursSaving] = useState(false);
+  const [hoursError, setHoursError] = useState('');
+  const [hoursSaved, setHoursSaved] = useState(false);
   useEffect(() => { if (prefillCustomerId) { setSelectedCustomerId(prefillCustomerId); setFormOpen(true); onPrefillHandled(); } }, [prefillCustomerId, onPrefillHandled]);
   const sorted = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -94,9 +106,30 @@ export function AppointmentPage({ customers, appointments, services, onCreate, o
     finally { setBookingPageSaving(false); }
   }
 
+  async function openHours() {
+    setHoursOpen(true); setHoursLoading(true); setHoursError(''); setHoursSaved(false);
+    try {
+      const result = await onGetBookingHours();
+      setHoursTimezone(result.timezone || 'Asia/Kolkata');
+      setHours(Object.fromEntries(weekdayNames.map((_, day) => {
+        const saved = result.hours[String(day)];
+        return [String(day), { closed: saved?.closed === true, open: saved?.open ?? '09:00', close: saved?.close ?? '18:00' }];
+      })));
+    } catch (reason) { setHoursError(reason instanceof Error ? reason.message : 'Could not load opening hours.'); }
+    finally { setHoursLoading(false); }
+  }
+
+  async function submitHours(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setHoursSaving(true); setHoursError(''); setHoursSaved(false);
+    try { await onSaveBookingHours(hours); setHoursSaved(true); }
+    catch (reason) { setHoursError(reason instanceof Error ? reason.message : 'Could not save opening hours.'); }
+    finally { setHoursSaving(false); }
+  }
+
   return <>
     <div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> APPOINTMENTS</div><h1>Appointments</h1><p>Keep your day running smoothly.</p></div><div className="appointment-page-actions"><button className="secondary-button" disabled={bookingPageSaving} onClick={() => void shareBookingPage()}><Link2 size={15}/>{bookingPageSaving ? 'Creating…' : 'Share booking page'}</button><button className="primary-button" onClick={() => { setError(''); setFormOpen(true); }}><Plus size={17}/>New appointment</button></div></div>
-    {bookingUrl && <div className="panel booking-share-panel"><div><strong>Your booking page</strong><span>Customers can request a time; it appears as Pending until you confirm it.</span><a href={bookingUrl} target="_blank" rel="noreferrer">{bookingUrl}</a></div><button className="secondary-button" onClick={async () => { try { await navigator.clipboard.writeText(bookingUrl); setBookingUrlCopied(true); window.setTimeout(() => setBookingUrlCopied(false), 2200); } catch { setBookingPageError('Could not copy the link. Select and copy it above.'); } }}>{bookingUrlCopied ? <Check size={14}/> : <Copy size={14}/>} {bookingUrlCopied ? 'Copied' : 'Copy link'}</button></div>}
+    {bookingUrl && <div className="panel booking-share-panel"><div><strong>Your booking page</strong><span>Customers can request a time; it appears as Pending until you confirm it.</span><a href={bookingUrl} target="_blank" rel="noreferrer">{bookingUrl}</a></div><div className="booking-share-actions"><button className="secondary-button" onClick={() => void openHours()}>{hoursOpen ? 'Refresh hours' : 'Manage hours'}</button><button className="secondary-button" onClick={async () => { try { await navigator.clipboard.writeText(bookingUrl); setBookingUrlCopied(true); window.setTimeout(() => setBookingUrlCopied(false), 2200); } catch { setBookingPageError('Could not copy the link. Select and copy it above.'); } }}>{bookingUrlCopied ? <Check size={14}/> : <Copy size={14}/>} {bookingUrlCopied ? 'Copied' : 'Copy link'}</button></div></div>}
+    {hoursOpen && bookingUrl && <form className="panel business-hours-panel" onSubmit={submitHours}><div className="business-hours-heading"><div><strong>Booking hours</strong><span>Choose when customers can request an appointment. Time zone: {hoursTimezone}</span></div><button type="button" className="icon-button" aria-label="Close opening hours" onClick={() => setHoursOpen(false)}><X size={17}/></button></div>{hoursLoading ? <p>Loading your hours…</p> : <><div className="business-hours-grid">{weekdayNames.map((day, index) => <label className="business-hours-row" key={day}><strong>{day}</strong><span className="closed-toggle"><input type="checkbox" checked={hours[String(index)].closed} onChange={event => setHours(current => ({ ...current, [String(index)]: { ...current[String(index)], closed: event.target.checked } }))}/> Closed</span><input type="time" aria-label={`${day} opening time`} value={hours[String(index)].open} disabled={hours[String(index)].closed} onChange={event => setHours(current => ({ ...current, [String(index)]: { ...current[String(index)], open: event.target.value } }))}/><span className="hours-to">to</span><input type="time" aria-label={`${day} closing time`} value={hours[String(index)].close} disabled={hours[String(index)].closed} onChange={event => setHours(current => ({ ...current, [String(index)]: { ...current[String(index)], close: event.target.value } }))}/></label>)}</div>{hoursError && <p className="form-error" role="alert">{hoursError}</p>}<div className="business-hours-footer">{hoursSaved && <span className="hours-saved"><Check size={14}/> Hours saved</span>}<button type="submit" className="primary-button" disabled={hoursSaving}>{hoursSaving ? 'Saving…' : 'Save hours'}</button></div></>}</form>}
     {bookingPageError && <p className="form-error status-error" role="alert">{bookingPageError}</p>}
     <section className="panel section-table">
       <div className="table-toolbar appointment-toolbar"><div className="search-field"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search appointments" aria-label="Search appointments"/></div><div className="appointment-filter-group"><label><span>Date</span><select className="appointment-filter" value={dateFilter} onChange={event => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">All dates</option><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="past">Past</option></select></label><label><span>Status</span><select className="appointment-filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)}><option>All statuses</option><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option><option>No show</option></select></label></div><span>{sorted.length} appointments</span></div>
