@@ -1,0 +1,46 @@
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { ArrowDownLeft, Check, CreditCard, Copy, Plus, Search, X } from 'lucide-react';
+import type { Invoice, Payment } from '../types';
+import './payments.css';
+
+const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
+function balance(invoice: Invoice) { return Math.max(0, invoice.amount - (invoice.paidAmount ?? 0)); }
+
+export function PaymentPage({ invoices, payments, onCreate, prefillInvoiceId, onPrefillHandled, businessName }: { businessName: string; invoices: Invoice[]; payments: Payment[]; prefillInvoiceId?: string | null; onPrefillHandled: () => void; onCreate: (input: { invoiceId: string; amount: number; method: Payment['method'] }) => Promise<void> }) {
+  const [query, setQuery] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [copiedId, setCopiedId] = useState('');
+  const [copyError, setCopyError] = useState('');
+  const outstanding = invoices.filter(invoice => balance(invoice) > 0);
+  const selectedInvoice = outstanding.find(invoice => invoice.id === selectedInvoiceId);
+  const filtered = useMemo(() => payments.filter(payment => `${payment.invoiceNumber} ${payment.customerName} ${payment.method}`.toLowerCase().includes(query.toLowerCase())), [payments, query]);
+  const totalReceived = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalOutstanding = invoices.reduce((sum, invoice) => sum + balance(invoice), 0);
+  useEffect(() => { if (prefillInvoiceId) { const invoice = outstanding.find(item => item.id === prefillInvoiceId); if (invoice) { setSelectedInvoiceId(invoice.id); setAmount(balance(invoice).toFixed(2)); setFormOpen(true); } onPrefillHandled(); } }, [prefillInvoiceId]);
+
+  async function copyReminder(invoice: Invoice) {
+    const dueDate = new Date(`${invoice.dueDate}T00:00:00`).toLocaleDateString([], { month: 'long', day: 'numeric' });
+    const message = `Hi ${invoice.customerName}, just a friendly reminder that invoice ${invoice.invoiceNumber} for ${inr.format(balance(invoice))} is due${invoice.dueDate ? ` on ${dueDate}` : ''}. Please let me know if you have any questions. Thank you, ${businessName}.`;
+    setCopyError('');
+    try { await navigator.clipboard.writeText(message); setCopiedId(invoice.id); window.setTimeout(() => setCopiedId(current => current === invoice.id ? '' : current), 2200); }
+    catch { setCopyError('Could not copy the reminder. Check your browser clipboard permission.'); }
+  }
+
+  function openForm() { setError(''); setSelectedInvoiceId(outstanding[0]?.id ?? ''); setAmount(outstanding[0] ? balance(outstanding[0]).toFixed(2) : ''); setFormOpen(true); }
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setSaving(true); setError('');
+    try {
+      await onCreate({ invoiceId: String(data.get('invoiceId') ?? ''), amount: Number(data.get('amount')), method: String(data.get('method') ?? 'Other') as Payment['method'] });
+      setFormOpen(false);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not record this payment.'); }
+    finally { setSaving(false); }
+  }
+
+  return <><div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> PAYMENTS</div><h1>Payments</h1><p>Record payments and track invoice balances.</p></div><button className="primary-button" onClick={openForm} disabled={outstanding.length === 0}><Plus size={17}/>Record payment</button></div><div className="invoice-summary"><div className="panel invoice-summary-card"><span>Total received</span><strong>{inr.format(totalReceived)}</strong><small>{payments.length} recorded payments</small></div><div className="panel invoice-summary-card"><span>Still outstanding</span><strong>{inr.format(totalOutstanding)}</strong><small>Across unpaid invoices</small></div></div>{outstanding.length > 0 && <section className="panel reminder-panel"><div className="table-toolbar"><div><strong>Invoices needing payment</strong><small>Copy a polite reminder to send yourself.</small></div><span>{outstanding.length} outstanding</span></div>{outstanding.map(invoice => <div className="reminder-row" key={invoice.id}><div><strong>{invoice.customerName}</strong><span>{invoice.invoiceNumber} · {inr.format(balance(invoice))} due</span></div><button className="secondary-button reminder-copy" onClick={() => void copyReminder(invoice)}>{copiedId === invoice.id ? <Check size={14}/> : <Copy size={14}/>} {copiedId === invoice.id ? 'Copied' : 'Copy reminder'}</button></div>)}{copyError && <p className="form-error" role="alert">{copyError}</p>}</section>}<section className="panel section-table"><div className="table-toolbar"><div className="search-field"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search payments" aria-label="Search payments"/></div><span>{filtered.length} payments</span></div><div className="table-header payment-table"><span>PAYMENT</span><span>CUSTOMER / INVOICE</span><span>METHOD</span><span>DATE</span><span>AMOUNT</span></div>{filtered.map(payment => <div className="table-row payment-table" key={payment.id}><span className="payment-method-icon"><ArrowDownLeft size={15}/></span><span className="payment-customer"><strong>{payment.customerName}</strong><small>{payment.invoiceNumber}</small></span><span>{payment.method}</span><span>{new Date(payment.receivedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span><strong>{inr.format(payment.amount)}</strong></div>)}{filtered.length === 0 && <div className="invoice-empty"><div><CreditCard size={20}/></div><strong>{query ? 'No payments found' : 'No payments recorded'}</strong><span>{query ? 'Try another search.' : outstanding.length ? 'Record a payment to update its invoice balance.' : invoices.length ? 'All invoices are paid. Create another invoice to record a payment.' : 'Create an invoice before recording a payment.'}</span>{!query && outstanding.length > 0 && <button className="text-button" onClick={openForm}>Record a payment <ArrowDownLeft size={15}/></button>}</div>}</section>{formOpen && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setFormOpen(false); }}><section className="customer-modal" role="dialog" aria-modal="true" aria-labelledby="payment-form-title"><div className="modal-heading"><div><h2 id="payment-form-title">Record a payment</h2><p>Log money received against an invoice.</p></div><button className="icon-button" aria-label="Close form" onClick={() => setFormOpen(false)}><X size={18}/></button></div><form onSubmit={submit}><label>Invoice<select name="invoiceId" value={selectedInvoiceId} onChange={event => { const id = event.target.value; setSelectedInvoiceId(id); const invoice = outstanding.find(item => item.id === id); setAmount(invoice ? balance(invoice).toFixed(2) : ''); }} required>{outstanding.map(invoice => <option key={invoice.id} value={invoice.id}>{invoice.invoiceNumber} · {invoice.customerName} · {inr.format(balance(invoice))} due</option>)}</select></label>{selectedInvoice && <div className="payment-balance-note">Remaining balance: <strong>{inr.format(balance(selectedInvoice))}</strong></div>}<label>Amount received (₹)<input name="amount" type="number" min="0.01" step="0.01" max={selectedInvoice ? balance(selectedInvoice) : undefined} value={amount} onChange={event => setAmount(event.target.value)} required placeholder="0.00"/></label><label>Payment method<select name="method" defaultValue="UPI"><option>UPI</option><option>Cash</option><option>Card</option><option>Bank transfer</option><option>Other</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="payment-demo-note">This records a payment in BizPilot. It does not charge a card or transfer money.</div><div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || !selectedInvoice}>{saving ? 'Saving…' : 'Save payment'}</button></div></form></section></div>}</>;
+}

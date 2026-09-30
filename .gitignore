@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+.idea/
+*.log
+backend/data/customers.json
+backend/data/appointments.json
+backend/data/invoices.json
+backend/data/payments.json
+backend/data/*.json

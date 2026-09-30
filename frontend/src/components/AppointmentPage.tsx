@@ -1,0 +1,96 @@
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { CalendarDays, Clock3, Pencil, Plus, Search, X } from 'lucide-react';
+import type { Appointment, Customer, Service } from '../types';
+import './appointments.css';
+
+function todayInputValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+function asLocalDateTime(value: string) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+type AppointmentInput = { customerId: string; service: string; startsAt: string; durationMinutes: number };
+export function AppointmentPage({ customers, appointments, services, onCreate, onStatusChange, onReschedule, prefillCustomerId, onPrefillHandled }: {
+  customers: Customer[];
+  appointments: Appointment[];
+  services: Service[];
+  onCreate: (input: AppointmentInput) => Promise<void>;
+  onStatusChange: (id: string, status: Appointment['status']) => Promise<void>;
+  onReschedule: (id: string, startsAt: string, durationMinutes: number) => Promise<void>;
+  prefillCustomerId?: string | null;
+  onPrefillHandled: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'upcoming' | 'past'>('all');
+  const [statusFilter, setStatusFilter] = useState<Appointment['status'] | 'All statuses'>('All statuses');
+  const [formOpen, setFormOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState(45);
+  const [updatingId, setUpdatingId] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [rescheduleItem, setRescheduleItem] = useState<Appointment | null>(null);
+  const [scheduleError, setScheduleError] = useState('');
+  useEffect(() => { if (prefillCustomerId) { setSelectedCustomerId(prefillCustomerId); setFormOpen(true); onPrefillHandled(); } }, [prefillCustomerId, onPrefillHandled]);
+  const sorted = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    return appointments.filter(item => {
+      const startsAt = new Date(item.startsAt);
+      const matchesText = `${item.customer} ${item.service}`.toLowerCase().includes(query.toLowerCase());
+      const matchesStatus = statusFilter === 'All statuses' || item.status === statusFilter;
+      const matchesDate = dateFilter === 'all' || (dateFilter === 'today' ? startsAt >= today && startsAt < tomorrow : dateFilter === 'upcoming' ? startsAt >= tomorrow : startsAt < today);
+      return matchesText && matchesStatus && matchesDate;
+    }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  }, [appointments, query, dateFilter, statusFilter]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    setSaving(true); setError('');
+    try {
+      const selectedService = services.find(service => service.id === String(data.get('service') ?? ''));
+      await onCreate({ customerId: String(data.get('customerId') ?? ''), service: selectedService?.name ?? String(data.get('service') ?? '').trim(), startsAt: new Date(String(data.get('startsAt'))).toISOString(), durationMinutes: Number(data.get('durationMinutes')) });
+      setFormOpen(false); setSelectedServiceId(''); setSelectedCustomerId(''); setDurationMinutes(45);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save this appointment.'); }
+    finally { setSaving(false); }
+  }
+  async function saveSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    if (!rescheduleItem) return;
+    setSaving(true); setScheduleError('');
+    try {
+      await onReschedule(rescheduleItem.id, new Date(String(data.get('startsAt'))).toISOString(), Number(data.get('durationMinutes')));
+      setRescheduleItem(null);
+    } catch (reason) { setScheduleError(reason instanceof Error ? reason.message : 'Could not reschedule this appointment.'); }
+    finally { setSaving(false); }
+  }
+  async function changeStatus(item: Appointment, status: Appointment['status']) {
+    setUpdatingId(item.id); setStatusError('');
+    try { await onStatusChange(item.id, status); }
+    catch (reason) { setStatusError(reason instanceof Error ? reason.message : 'Could not update the appointment.'); }
+    finally { setUpdatingId(''); }
+  }
+
+  return <>
+    <div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> APPOINTMENTS</div><h1>Appointments</h1><p>Keep your day running smoothly.</p></div><button className="primary-button" onClick={() => { setError(''); setFormOpen(true); }}><Plus size={17}/>New appointment</button></div>
+    <section className="panel section-table">
+      <div className="table-toolbar appointment-toolbar"><div className="search-field"><Search size={16}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search appointments" aria-label="Search appointments"/></div><div className="appointment-filter-group"><label><span>Date</span><select className="appointment-filter" value={dateFilter} onChange={event => setDateFilter(event.target.value as typeof dateFilter)}><option value="all">All dates</option><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="past">Past</option></select></label><label><span>Status</span><select className="appointment-filter" value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)}><option>All statuses</option><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option><option>No show</option></select></label></div><span>{sorted.length} appointments</span></div>
+      <div className="table-header appointment-table"><span>TIME</span><span>CUSTOMER & SERVICE</span><span>STATUS & ACTIONS</span></div>
+      {statusError && <p className="form-error status-error" role="alert">{statusError}</p>}
+      {sorted.map(item => <div className="table-row appointment-table" key={item.id}>
+        <div className="appointment-date"><strong>{new Date(item.startsAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</strong><span>{new Date(item.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+        <div className="table-customer"><div className={`person-avatar ${item.tone}`}>{item.initials}</div><span><strong>{item.customer}</strong><small>{item.service} · {item.durationMinutes} min</small></span></div>
+        <div className="appointment-actions"><select className={`status-select status ${item.status.toLowerCase().replace(' ', '-')}`} aria-label={`Status for ${item.customer}`} value={item.status} disabled={updatingId === item.id} onChange={event => void changeStatus(item, event.target.value as Appointment['status'])}><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option><option>No show</option></select><button type="button" className="reschedule-button" onClick={() => { setScheduleError(''); setRescheduleItem(item); }} aria-label={`Reschedule ${item.customer}`} title="Reschedule"><Pencil size={13}/></button></div>
+      </div>)}
+      {sorted.length === 0 && <div className="empty-state">{appointments.length === 0 ? 'No appointments yet. Add one to get started.' : 'No appointments match these filters.'}</div>}
+    </section>
+    {rescheduleItem && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setRescheduleItem(null); }}><section className="customer-modal" role="dialog" aria-modal="true" aria-labelledby="reschedule-title"><div className="modal-heading"><div><h2 id="reschedule-title">Reschedule appointment</h2><p>{rescheduleItem.customer} · {rescheduleItem.service}</p></div><button className="icon-button" aria-label="Close form" onClick={() => setRescheduleItem(null)}><X size={18}/></button></div><form onSubmit={saveSchedule}><label>Date and time<input name="startsAt" type="datetime-local" min={todayInputValue()} defaultValue={asLocalDateTime(rescheduleItem.startsAt)} required/></label><label>Duration in minutes<input name="durationMinutes" type="number" min="5" max="480" step="5" defaultValue={rescheduleItem.durationMinutes} required/></label>{scheduleError && <p className="form-error" role="alert">{scheduleError}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setRescheduleItem(null)}>Cancel</button><button type="submit" className="primary-button" disabled={saving}>{saving ? 'Saving…' : 'Save new time'}</button></div></form></section></div>}
+    {formOpen && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setFormOpen(false); }}><section className="customer-modal" role="dialog" aria-modal="true" aria-labelledby="appointment-form-title"><div className="modal-heading"><div><h2 id="appointment-form-title">Schedule an appointment</h2><p>Choose a customer, service, and time.</p></div><button className="icon-button" aria-label="Close form" onClick={() => setFormOpen(false)}><X size={18}/></button></div><form onSubmit={submit}><label>Customer<select name="customerId" required value={selectedCustomerId} onChange={event => setSelectedCustomerId(event.target.value)} disabled={customers.length === 0}><option value="" disabled>Select a customer</option>{customers.map(customer => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>{customers.length === 0 && <p className="form-error">Add a customer before scheduling.</p>}{services.length ? <label>Service<select name="service" required value={selectedServiceId} onChange={event => { const service = services.find(item => item.id === event.target.value); setSelectedServiceId(service?.id ?? ''); if (service) setDurationMinutes(service.durationMinutes); }}><option value="" disabled>Select a service</option>{services.map(service => <option key={service.id} value={service.id}>{service.name} · ₹{service.price}</option>)}</select></label> : <label>Service<input name="service" required minLength={2} placeholder="e.g. Haircut & styling"/></label>}<label>Date and time<span className="date-label"><CalendarDays size={14}/><Clock3 size={14}/></span><input name="startsAt" type="datetime-local" min={todayInputValue()} defaultValue={todayInputValue()} required/></label><label>Duration in minutes<input name="durationMinutes" type="number" min="5" max="480" step="5" value={durationMinutes} onChange={event => setDurationMinutes(Number(event.target.value))} required/></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>Cancel</button><button type="submit" className="primary-button" disabled={saving || customers.length === 0}>{saving ? 'Saving…' : 'Save appointment'}</button></div></form></section></div>}
+  </>;
+}
