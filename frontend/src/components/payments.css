@@ -1,12 +1,12 @@
 .payment-table{grid-template-columns:.35fr 1.3fr .8fr .9fr .7fr;gap:10px}
-.payment-method-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#eaf3ed;color:#43805e}
+.payment-method-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#EAF0FF;color:#0057FF}
 .payment-customer{display:grid;gap:3px}
 .payment-customer strong{font-size:10px;font-weight:600;color:#344239}
 .payment-customer small{font-size:8px;color:#8d9991}
 .payment-table>strong{font-size:10px;color:#344239;text-align:right}
-.payment-balance-note{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:6px;background:#f4f8f4;color:#78857d;font-size:10px}
-.payment-balance-note strong{color:#2e714f}
+.payment-balance-note{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border-radius:6px;background:#F8F7F4;color:#78857d;font-size:10px}
+.payment-balance-note strong{color:#0057FF}
 .payment-demo-note{padding:9px 10px;border-radius:6px;background:#fbf7ed;color:#967b4f;font-size:9px;line-height:1.5}
 @media(max-width:620px){.payment-table{grid-template-columns:.35fr 1.2fr .8fr;gap:6px;padding:10px 4px}.payment-table> :nth-child(3),.payment-table> :nth-child(4){display:none}.payment-table>strong{font-size:8px}.payment-customer strong{font-size:8px}.payment-customer small{font-size:7px}}
-.reminder-panel{padding:15px 17px;margin-bottom:14px}.reminder-panel .table-toolbar>div{display:grid;gap:4px}.reminder-panel .table-toolbar>div strong{font-size:11px;color:#334138}.reminder-panel .table-toolbar>div small{font-size:9px;color:#8a958e}.reminder-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #eef1ee}.reminder-row>div{display:grid;gap:4px}.reminder-row>div strong{font-size:10px;color:#37443c}.reminder-row>div span{font-size:9px;color:#839087}.reminder-copy{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:9px;padding:7px 9px}
+.reminder-panel{padding:15px 17px;margin-bottom:14px}.reminder-panel .table-toolbar>div{display:grid;gap:4px}.reminder-panel .table-toolbar>div strong{font-size:11px;color:#334138}.reminder-panel .table-toolbar>div small{font-size:9px;color:#8a958e}.reminder-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #EAE7E1}.reminder-row>div{display:grid;gap:4px}.reminder-row>div strong{font-size:10px;color:#37443c}.reminder-row>div span{font-size:9px;color:#839087}.reminder-copy{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:9px;padding:7px 9px}
 @media(max-width:620px){.reminder-panel{padding:12px}.reminder-copy{font-size:8px;padding:7px}.reminder-row{gap:6px}}
