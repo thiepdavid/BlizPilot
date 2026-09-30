@@ -10,7 +10,7 @@ import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from '.
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
-import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingHours, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingHours } from './publicBooking.js';
+import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
 
 export const app = express();
@@ -51,6 +51,28 @@ app.patch('/api/public-booking/hours', businessAuth, async (request, response, n
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Business hours require a signed-in Supabase business.' }); return; }
     response.json(await saveBusinessBookingHours(context, hours as Record<string, unknown>));
+  } catch (error) { next(error); }
+});
+
+app.get('/api/public-booking/closed-dates', businessAuth, async (request, response, next) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Booking closures require a signed-in Supabase business.' }); return; }
+    response.json({ dates: await getBusinessBookingClosures(context) });
+  } catch (error) { next(error); }
+});
+
+app.patch('/api/public-booking/closed-dates', businessAuth, async (request, response, next) => {
+  const dates = request.body?.dates;
+  const validDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+  if (!Array.isArray(dates) || dates.length > 365 || !dates.every(validDate)) {
+    response.status(400).json({ error: 'Choose valid dates, up to 365 closed dates.' }); return;
+  }
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Booking closures require a signed-in Supabase business.' }); return; }
+    response.json({ dates: await saveBusinessBookingClosures(context, [...new Set(dates)]) });
   } catch (error) { next(error); }
 });
 

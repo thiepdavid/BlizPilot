@@ -4,7 +4,7 @@ import './public-booking.css';
 
 type PublicService = { id: string; name: string; description: string; durationMinutes: number; price: number };
 type DayHours = { closed?: boolean; open?: string; close?: string };
-type BookingInfo = { businessName: string; timezone: string; hours: Record<string, DayHours>; services: PublicService[] };
+type BookingInfo = { businessName: string; timezone: string; hours: Record<string, DayHours>; closedDates: string[]; services: PublicService[] };
 
 function currentDateInZone(timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
@@ -18,8 +18,9 @@ function dateInDays(date: string, days: number) {
   return result.toISOString().slice(0, 10);
 }
 
-function timeOptions(date: string, hours: Record<string, DayHours>, durationMinutes: number, timeZone: string) {
+function timeOptions(date: string, hours: Record<string, DayHours>, closedDates: string[], durationMinutes: number, timeZone: string) {
   if (!date) return [];
+  if (closedDates.includes(date)) return [];
   const dayNumber = new Date(`${date}T12:00:00Z`).getUTCDay();
   const day = hours[String(dayNumber)];
   if (!day || day.closed || !day.open || !day.close) return [];
@@ -71,7 +72,8 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
   }, [apiBase, slug]);
 
   const chosenService = page?.services.find(item => item.id === serviceId);
-  const slots = page && chosenService ? timeOptions(requestedDate, page.hours, chosenService.durationMinutes, page.timezone || 'Asia/Kolkata') : [];
+  const slots = page && chosenService ? timeOptions(requestedDate, page.hours, page.closedDates ?? [], chosenService.durationMinutes, page.timezone || 'Asia/Kolkata') : [];
+  const dateClosed = Boolean(page && (page.closedDates ?? []).includes(requestedDate));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,7 +107,8 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
         <label>Your name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Full name"/></label>
         <div className="public-contact-grid"><label>Phone<input name="phone" type="tel" maxLength={40} autoComplete="tel" placeholder="Phone number"/></label><label>Email<input name="email" type="email" maxLength={254} autoComplete="email" placeholder="Email address"/></label></div>
         <p className="public-contact-help">Please provide a phone number or email so the business can confirm.</p>
-        <div className="public-booking-time-grid"><label>Date<span className="public-date-icon"><CalendarDays size={14}/></span><input name="date" type="date" value={requestedDate} min={today} max={lastDate} onChange={event => { setRequestedDate(event.target.value); setRequestedTime(''); }} required/></label><label>Available time<span className="public-date-icon"><Clock3 size={14}/></span><select name="time" value={requestedTime} onChange={event => setRequestedTime(event.target.value)} required disabled={!slots.length}><option value="">{slots.length ? 'Choose a time' : 'Closed on this date'}</option>{slots.map(time => <option key={time} value={time}>{time}</option>)}</select></label></div>
+        <div className="public-booking-time-grid"><label>Date<span className="public-date-icon"><CalendarDays size={14}/></span><input name="date" type="date" value={requestedDate} min={today} max={lastDate} onChange={event => { setRequestedDate(event.target.value); setRequestedTime(''); }} required/></label><label>Available time<span className="public-date-icon"><Clock3 size={14}/></span><select name="time" value={requestedTime} onChange={event => setRequestedTime(event.target.value)} required disabled={!slots.length}><option value="">{slots.length ? 'Choose a time' : dateClosed ? 'Closed on this date' : 'No times available'}</option>{slots.map(time => <option key={time} value={time}>{time}</option>)}</select></label></div>
+        {dateClosed && <p className="public-closed-date-note">This business is closed on the selected date. Please choose another day.</p>}
         <p className="public-contact-help">Times shown in {page.timezone}. Requests are pending until the business confirms.</p>
         {error && <p className="public-booking-error" role="alert">{error}</p>}
         <button className="public-booking-submit" type="submit" disabled={saving || !serviceId || !requestedTime}>{saving ? 'Sending request…' : 'Request appointment'}</button>
