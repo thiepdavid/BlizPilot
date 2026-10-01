@@ -275,7 +275,16 @@ app.patch('/api/business-profile', async (request, response, next) => {
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Business profile updates require a signed-in cloud account.' }); return; }
     response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim(), currencyCode: currencyCode as string }));
-  } catch (error) { next(error); }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('Business currency is locked')) {
+      response.status(409).json({ error: message }); return;
+    }
+    if (/column .*currency_code.* does not exist|currency_code.*schema cache/i.test(message)) {
+      response.status(503).json({ error: 'Currency settings are not installed in the database yet. Run database/business-currency.sql in Supabase, then redeploy the API.' }); return;
+    }
+    next(error);
+  }
 });
 
 app.use('/api/services', businessAuth);
