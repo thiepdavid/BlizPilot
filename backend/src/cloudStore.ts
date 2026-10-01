@@ -9,7 +9,8 @@ function check<T>(result: { data: T | null; error: { message: string } | null })
 function invoiceView(row: Row) {
   const amount = Number(row.total);
   const paidAmount = Number(row.paid_amount ?? 0);
-  return { id: row.id, businessId: row.business_id, invoiceNumber: row.invoice_number, customerId: row.customer_id, customerName: row.customers?.full_name ?? 'Customer', description: row.description, amount, subtotal: Number(row.subtotal ?? amount), tax: Number(row.tax ?? 0), paidAmount, dueDate: row.due_date, status: paidAmount >= amount ? 'Paid' : paidAmount > 0 ? 'Partially paid' : 'Unpaid', createdAt: row.created_at };
+  const items = Array.isArray(row.line_items) ? row.line_items : undefined;
+  return { id: row.id, businessId: row.business_id, invoiceNumber: row.invoice_number, customerId: row.customer_id, customerName: row.customers?.full_name ?? 'Customer', description: row.description, items, amount, subtotal: Number(row.subtotal ?? amount), tax: Number(row.tax ?? 0), paidAmount, dueDate: row.due_date, status: paidAmount >= amount ? 'Paid' : paidAmount > 0 ? 'Partially paid' : 'Unpaid', createdAt: row.created_at };
 }
 
 export async function cloudListCustomers(context: BusinessContext) {
@@ -40,18 +41,18 @@ export async function cloudCreateAppointment(context: BusinessContext, input: { 
 }
 
 export async function cloudListInvoices(context: BusinessContext) {
-  const data = check(await context.client.from('invoices').select('id,business_id,invoice_number,customer_id,description,subtotal,tax,total,paid_amount,due_date,status,created_at,customers(full_name)').eq('business_id', context.businessId).order('created_at', { ascending: false }));
+  const data = check(await context.client.from('invoices').select('id,business_id,invoice_number,customer_id,description,line_items,subtotal,tax,total,paid_amount,due_date,status,created_at,customers(full_name)').eq('business_id', context.businessId).order('created_at', { ascending: false }));
   return data.map((row: Row) => invoiceView(row));
 }
 
-export async function cloudCreateInvoice(context: BusinessContext, input: { customerId: string; description: string; amount: number; taxRate: number; dueDate: string }) {
+export async function cloudCreateInvoice(context: BusinessContext, input: { customerId: string; description: string; items?: { description: string; quantity: number; unitPrice: number; total: number }[]; amount: number; taxRate: number; dueDate: string }) {
   const { data: customer, error: customerError } = await context.client.from('customers').select('id').eq('id', input.customerId).eq('business_id', context.businessId).maybeSingle();
   if (customerError || !customer) throw new Error('Choose a customer from your customer list.');
   const year = new Date().getFullYear();
   const tax = Math.round(input.amount * input.taxRate) / 100;
   const total = input.amount + tax;
   const invoiceNumber = `BP-${year}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-  const data = check(await context.client.from('invoices').insert({ business_id: context.businessId, customer_id: input.customerId, invoice_number: invoiceNumber, description: input.description, subtotal: input.amount, tax, total, due_date: input.dueDate, status: 'sent' }).select('id,business_id,invoice_number,customer_id,description,subtotal,tax,total,paid_amount,due_date,status,created_at,customers(full_name)').single()) as Row;
+  const data = check(await context.client.from('invoices').insert({ business_id: context.businessId, customer_id: input.customerId, invoice_number: invoiceNumber, description: input.description, line_items: input.items ?? [], subtotal: input.amount, tax, total, due_date: input.dueDate, status: 'sent' }).select('id,business_id,invoice_number,customer_id,description,line_items,subtotal,tax,total,paid_amount,due_date,status,created_at,customers(full_name)').single()) as Row;
   return invoiceView(data);
 }
 

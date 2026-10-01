@@ -470,17 +470,37 @@ app.get('/api/invoices', async (request, response, next) => {
 });
 
 app.post('/api/invoices', async (request, response, next) => {
-  const { customerId, description, amount, taxRate, dueDate } = request.body as { customerId?: unknown; description?: unknown; amount?: unknown; taxRate?: unknown; dueDate?: unknown };
+  const { customerId, description, items, amount, taxRate, dueDate } = request.body as { customerId?: unknown; description?: unknown; items?: unknown; amount?: unknown; taxRate?: unknown; dueDate?: unknown };
   const parsedAmount = Number(amount);
   const parsedTaxRate = taxRate === undefined ? 0 : Number(taxRate);
-  if (typeof customerId !== 'string' || typeof description !== 'string' || description.trim().length < 2 || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !Number.isFinite(parsedTaxRate) || parsedTaxRate < 0 || parsedTaxRate > 100 || typeof dueDate !== 'string' || Number.isNaN(Date.parse(dueDate))) {
-    response.status(400).json({ error: 'Enter a customer, invoice description, positive amount, and valid due date.' });
+  let invoiceItems: { description: string; quantity: number; unitPrice: number; total: number }[] | undefined;
+  if (items !== undefined) {
+    if (!Array.isArray(items) || items.length < 1 || items.length > 50) {
+      response.status(400).json({ error: 'Add between 1 and 50 invoice items.' }); return;
+    }
+    invoiceItems = [];
+    for (const item of items) {
+      const row = item as { description?: unknown; quantity?: unknown; unitPrice?: unknown };
+      const itemDescription = typeof row?.description === 'string' ? row.description.trim() : '';
+      const quantity = Number(row?.quantity);
+      const unitPrice = Number(row?.unitPrice);
+      if (itemDescription.length < 1 || itemDescription.length > 200 || !Number.isFinite(quantity) || quantity <= 0 || quantity > 10000 || !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 1_000_000_000) {
+        response.status(400).json({ error: 'Each item needs a description, positive quantity, and valid unit price.' }); return;
+      }
+      const total = Math.round(quantity * unitPrice * 100) / 100;
+      invoiceItems.push({ description: itemDescription, quantity, unitPrice: Math.round(unitPrice * 100) / 100, total });
+    }
+  }
+  const subtotal = invoiceItems ? Math.round(invoiceItems.reduce((sum, item) => sum + item.total, 0) * 100) / 100 : Math.round(parsedAmount * 100) / 100;
+  const invoiceDescription = invoiceItems ? invoiceItems.map(item => item.description).join(', ') : typeof description === 'string' ? description.trim() : '';
+  if (typeof customerId !== 'string' || invoiceDescription.length < (invoiceItems ? 1 : 2) || invoiceDescription.length > 12000 || !Number.isFinite(subtotal) || subtotal <= 0 || !Number.isFinite(parsedTaxRate) || parsedTaxRate < 0 || parsedTaxRate > 100 || typeof dueDate !== 'string' || Number.isNaN(Date.parse(dueDate))) {
+    response.status(400).json({ error: 'Enter a customer, at least one valid invoice item, and a valid due date.' });
     return;
   }
   try {
     const cloud = (request as AuthenticatedRequest).businessContext;
-    if (cloud) { response.status(201).json(await cloudCreateInvoice(cloud, { customerId, description: description.trim(), amount: Math.round(parsedAmount * 100) / 100, taxRate: parsedTaxRate, dueDate })); return; }
-    const invoice = await createInvoice({ customerId, description: description.trim(), amount: Math.round(parsedAmount * 100) / 100, taxRate: parsedTaxRate, dueDate });
+    if (cloud) { response.status(201).json(await cloudCreateInvoice(cloud, { customerId, description: invoiceDescription, items: invoiceItems, amount: subtotal, taxRate: parsedTaxRate, dueDate })); return; }
+    const invoice = await createInvoice({ customerId, description: invoiceDescription, items: invoiceItems, amount: subtotal, taxRate: parsedTaxRate, dueDate });
     response.status(201).json(invoice);
   } catch (error) {
     if (error instanceof Error && error.message === 'Choose a customer from your customer list.') {

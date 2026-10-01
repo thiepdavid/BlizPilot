@@ -19,7 +19,7 @@ import { SalesOverview } from './components/SalesOverview';
 import { AuthPage } from './components/AuthPage';
 import { ActionMenu } from './components/ActionMenu';
 import { appointments as sampleAppointments, customers as sampleCustomers } from './data/mockData';
-import type { Appointment, Invoice, NavKey, Payment, Service, Expense, Campaign } from './types';
+import type { Appointment, Invoice, InvoiceLineItem, NavKey, Payment, Service, Expense, Campaign } from './types';
 import { supabase } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import './styles.css';
@@ -213,7 +213,7 @@ export default function App() {
     if (!response.ok) throw new Error(result.error ?? 'Could not save closed dates.');
   }
 
-  async function addInvoice(input: { customerId: string; description: string; amount: number; taxRate: number; dueDate: string }) {
+  async function addInvoice(input: { customerId: string; description: string; items: InvoiceLineItem[]; amount: number; taxRate: number; dueDate: string }) {
     const response = await fetch(`${apiBase}/api/invoices`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this invoice.');
