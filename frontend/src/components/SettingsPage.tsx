@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Building2, UserRound } from 'lucide-react';
 import { currencyName, supportedCurrencies, type CurrencyCode } from '../lib/currency';
+import { countryCode, countryFields, countryOptions } from '../lib/countryProfile';
 import './settings.css';
 
 export type BusinessLocation = {
@@ -29,7 +30,10 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [currencyDraft, setCurrencyDraft] = useState<CurrencyCode>(currencyCode);
+  const [countryDraft, setCountryDraft] = useState(() => countryCode(location.country));
   useEffect(() => setCurrencyDraft(currencyCode), [currencyCode]);
+  useEffect(() => setCountryDraft(countryCode(location.country)), [location.country]);
+  const fields = countryFields(countryDraft);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,16 +66,16 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
         <label>Business currency<select value={currencyDraft} onChange={event => setCurrencyDraft(event.target.value as CurrencyCode)}>{supportedCurrencies.map(code => <option key={code} value={code}>{code} — {currencyName(code)}</option>)}</select></label>
         <p className="settings-help">Currency applies to business records. It does not convert existing amounts, and is locked after you add prices or financial records.</p>
         <div className="settings-location-fields">
-          <label>Country or region<input name="country" maxLength={100} defaultValue={location.country} placeholder="Country or region"/></label>
+          <label>Country or region<select name="country" value={countryDraft} onChange={event => setCountryDraft(event.target.value)}><option value="">Select a country or region</option>{countryOptions.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
           <label>Business address<input name="addressLine1" maxLength={200} defaultValue={location.addressLine1} placeholder="Street address" autoComplete="street-address"/></label>
           <div className="settings-address-row">
             <label>City or town<input name="city" maxLength={100} defaultValue={location.city} autoComplete="address-level2"/></label>
-            <label>State, province, or region<input name="region" maxLength={100} defaultValue={location.region} autoComplete="address-level1"/></label>
+            <label>{fields.regionLabel}<input name="region" maxLength={100} defaultValue={location.region} autoComplete="address-level1"/></label>
           </div>
-          <label>Postal code<input name="postalCode" maxLength={30} defaultValue={location.postalCode} autoComplete="postal-code"/></label>
-          <label>Tax ID <span>(optional)</span><input name="taxId" maxLength={100} defaultValue={location.taxId} placeholder="Local business tax identifier"/></label>
+          <label>{fields.postalLabel}<input name="postalCode" maxLength={30} defaultValue={location.postalCode} autoComplete="postal-code"/></label>
+          <label>{fields.taxLabel} <span>(optional)</span><input name="taxId" maxLength={100} defaultValue={location.taxId} placeholder={fields.taxLabel}/><small>{fields.taxHint}</small></label>
         </div>
-        <p className="settings-help">Country-specific tax rules and required invoice details vary. These fields are optional and aren’t validated against local tax laws.</p>
+        <p className="settings-help">Field names adapt to the selected country. Whether an address detail or tax number is legally required depends on your business and registration; BizPilot doesn’t determine or validate local tax obligations.</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {message && <p className="settings-success" role="status">{message}</p>}
         <div className="modal-actions"><button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button></div>
