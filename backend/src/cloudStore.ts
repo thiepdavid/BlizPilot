@@ -45,15 +45,18 @@ export async function cloudListInvoices(context: BusinessContext) {
   return data.map((row: Row) => invoiceView(row));
 }
 
-export async function cloudCreateInvoice(context: BusinessContext, input: { customerId: string; description: string; items?: { description: string; quantity: number; unitPrice: number; total: number }[]; amount: number; taxRate: number; dueDate: string }) {
-  const { data: customer, error: customerError } = await context.client.from('customers').select('id').eq('id', input.customerId).eq('business_id', context.businessId).maybeSingle();
-  if (customerError || !customer) throw new Error('Choose a customer from your customer list.');
-  const year = new Date().getFullYear();
-  const tax = Math.round(input.amount * input.taxRate) / 100;
-  const total = input.amount + tax;
-  const invoiceNumber = `BP-${year}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-  const data = check(await context.client.from('invoices').insert({ business_id: context.businessId, customer_id: input.customerId, invoice_number: invoiceNumber, description: input.description, line_items: input.items ?? [], subtotal: input.amount, tax, total, due_date: input.dueDate, status: 'sent' }).select('id,business_id,invoice_number,customer_id,description,line_items,subtotal,tax,total,paid_amount,due_date,status,created_at,customers(full_name)').single()) as Row;
-  return invoiceView(data);
+export async function cloudCreateInvoice(context: BusinessContext, input: { customerId: string; description: string; items?: { description: string; quantity: number; unitPrice: number; total: number; inventoryItemId?: string }[]; amount: number; taxRate: number; dueDate: string }) {
+  const invoiceItems = input.items?.length ? input.items : [{ description: input.description, quantity: 1, unitPrice: input.amount, total: input.amount }];
+  const id = check(await context.client.rpc('create_bizpilot_invoice_with_inventory', {
+    target_customer_id: input.customerId,
+    target_description: input.description,
+    target_items: invoiceItems,
+    target_tax_rate: input.taxRate,
+    target_due_date: input.dueDate,
+  })) as string;
+  const created = (await cloudListInvoices(context)).find(invoice => invoice.id === id);
+  if (!created) throw new Error('The invoice was created but could not be reloaded. Refresh Billing to view it.');
+  return created;
 }
 
 export async function cloudListPayments(context: BusinessContext) {

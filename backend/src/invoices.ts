@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listCustomers } from './customers.js';
+import { reserveInventoryForInvoice, restoreInventoryForInvoice } from './inventory.js';
 
 export interface InvoiceRecord {
   id: string;
@@ -10,7 +11,7 @@ export interface InvoiceRecord {
   customerId: string;
   customerName: string;
   description: string;
-  items?: { description: string; quantity: number; unitPrice: number; total: number }[];
+  items?: { description: string; quantity: number; unitPrice: number; total: number; inventoryItemId?: string; costPrice?: number }[];
   amount: number;
   subtotal?: number;
   tax?: number;
@@ -37,21 +38,26 @@ export async function listInvoices(): Promise<InvoiceRecord[]> {
   return (await readStore()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function createInvoice(input: { customerId: string; description: string; items?: { description: string; quantity: number; unitPrice: number; total: number }[]; amount: number; taxRate: number; dueDate: string }): Promise<InvoiceRecord> {
+export async function createInvoice(input: { customerId: string; description: string; items?: { description: string; quantity: number; unitPrice: number; total: number; inventoryItemId?: string; costPrice?: number }[]; amount: number; taxRate: number; dueDate: string }): Promise<InvoiceRecord> {
   const customer = (await listCustomers()).find(item => item.id === input.customerId);
   if (!customer) throw new Error('Choose a customer from your customer list.');
+  let items = input.items;
+  const reservedItems = items?.some(item => item.inventoryItemId) ? items : undefined;
+  if (items && reservedItems) items = await reserveInventoryForInvoice(items);
+  const subtotal = items?.length ? Math.round(items.reduce((sum, item) => sum + item.total, 0) * 100) / 100 : input.amount;
   let created!: InvoiceRecord;
-  pendingWrite = pendingWrite.then(async () => {
+  const task = pendingWrite.then(async () => {
     const invoices = await readStore();
     const year = new Date().getFullYear();
     const sequence = invoices.filter(invoice => invoice.invoiceNumber.startsWith(`BP-${year}-`)).length + 1;
-    const tax = Math.round(input.amount * input.taxRate) / 100;
-    created = { id: crypto.randomUUID(), businessId: customer.businessId, invoiceNumber: `BP-${year}-${String(sequence).padStart(4, '0')}`, customerId: customer.id, customerName: customer.name, description: input.description, items: input.items, subtotal: input.amount, tax, amount: input.amount + tax, paidAmount: 0, dueDate: input.dueDate, status: 'Unpaid', createdAt: new Date().toISOString() };
+    const tax = Math.round(subtotal * input.taxRate) / 100;
+    created = { id: crypto.randomUUID(), businessId: customer.businessId, invoiceNumber: `BP-${year}-${String(sequence).padStart(4, '0')}`, customerId: customer.id, customerName: customer.name, description: items?.map(item => item.description).join(', ') ?? input.description, items, subtotal, tax, amount: subtotal + tax, paidAmount: 0, dueDate: input.dueDate, status: 'Unpaid', createdAt: new Date().toISOString() };
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify([...invoices, created], null, 2)}\n`, 'utf8');
   });
-  await pendingWrite;
-  return created;
+  pendingWrite = task.then(() => undefined, () => undefined);
+  try { await task; return created; }
+  catch (error) { if (reservedItems) await restoreInventoryForInvoice(reservedItems); throw error; }
 }
 
 export async function recordInvoicePayment(invoiceId: string, amount: number): Promise<InvoiceRecord> {

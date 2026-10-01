@@ -24,3 +24,49 @@ export async function updateInventoryStock(id: string, quantity: number) {
   const task = pendingWrite.then(async () => { const rows = await readStore(); const index = rows.findIndex(row => row.id === id); if (index < 0) throw new Error('Inventory item not found.'); updated = { ...rows[index], quantity }; rows[index] = updated; await writeFile(filePath, `${JSON.stringify(rows, null, 2)}\n`, 'utf8'); });
   pendingWrite = task.then(() => undefined, () => undefined); await task; return updated;
 }
+
+export type InventoryInvoiceLine = { inventoryItemId?: string; description: string; quantity: number; unitPrice: number; total: number; costPrice?: number };
+export async function reserveInventoryForInvoice(items: InventoryInvoiceLine[]): Promise<InventoryInvoiceLine[]> {
+  let prepared: InventoryInvoiceLine[] = items;
+  const linked = items.filter(item => item.inventoryItemId);
+  if (!linked.length) return prepared;
+  const task = pendingWrite.then(async () => {
+    const rows = await readStore();
+    const needed = new Map<string, number>();
+    for (const item of linked) needed.set(item.inventoryItemId!, (needed.get(item.inventoryItemId!) ?? 0) + item.quantity);
+    const variants = new Map<string, InventoryRecord>();
+    for (const [id, quantity] of needed) {
+      const variant = rows.find(row => row.id === id);
+      if (!variant) throw new Error('A selected inventory product could not be found. Refresh Inventory and try again.');
+      if (!Number.isInteger(quantity)) throw new Error('Inventory product quantities must be whole numbers.');
+      if (variant.quantity < quantity) throw new Error(`Not enough stock for ${variant.name}${variant.size ? ` · ${variant.size}` : ''}${variant.color ? ` · ${variant.color}` : ''}.`);
+      variants.set(id, variant);
+    }
+    prepared = items.map(item => {
+      const variant = item.inventoryItemId ? variants.get(item.inventoryItemId) : undefined;
+      if (!variant) return item;
+      const description = [variant.name, variant.size, variant.color].filter(Boolean).join(' · ');
+      const unitPrice = variant.sellingPrice;
+      return { ...item, description, unitPrice, total: Math.round(unitPrice * item.quantity * 100) / 100, costPrice: variant.costPrice };
+    });
+    for (const [id, quantity] of needed) rows.find(item => item.id === id)!.quantity -= quantity;
+    await writeFile(filePath, `${JSON.stringify(rows, null, 2)}\n`, 'utf8');
+  });
+  pendingWrite = task.then(() => undefined, () => undefined);
+  await task;
+  return prepared;
+}
+
+export async function restoreInventoryForInvoice(items: Array<{ inventoryItemId?: string; quantity: number }>) {
+  const task = pendingWrite.then(async () => {
+    const rows = await readStore();
+    for (const item of items) {
+      if (!item.inventoryItemId) continue;
+      const row = rows.find(entry => entry.id === item.inventoryItemId);
+      if (row) row.quantity += item.quantity;
+    }
+    await writeFile(filePath, `${JSON.stringify(rows, null, 2)}\n`, 'utf8');
+  });
+  pendingWrite = task.then(() => undefined, () => undefined);
+  await task;
+}

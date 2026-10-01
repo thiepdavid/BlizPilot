@@ -507,22 +507,23 @@ app.post('/api/invoices', async (request, response, next) => {
   const { customerId, description, items, amount, taxRate, dueDate } = request.body as { customerId?: unknown; description?: unknown; items?: unknown; amount?: unknown; taxRate?: unknown; dueDate?: unknown };
   const parsedAmount = Number(amount);
   const parsedTaxRate = taxRate === undefined ? 0 : Number(taxRate);
-  let invoiceItems: { description: string; quantity: number; unitPrice: number; total: number }[] | undefined;
+  let invoiceItems: { description: string; quantity: number; unitPrice: number; total: number; inventoryItemId?: string }[] | undefined;
   if (items !== undefined) {
     if (!Array.isArray(items) || items.length < 1 || items.length > 50) {
       response.status(400).json({ error: 'Add between 1 and 50 invoice items.' }); return;
     }
     invoiceItems = [];
     for (const item of items) {
-      const row = item as { description?: unknown; quantity?: unknown; unitPrice?: unknown };
+      const row = item as { description?: unknown; quantity?: unknown; unitPrice?: unknown; inventoryItemId?: unknown };
       const itemDescription = typeof row?.description === 'string' ? row.description.trim() : '';
       const quantity = Number(row?.quantity);
       const unitPrice = Number(row?.unitPrice);
-      if (itemDescription.length < 1 || itemDescription.length > 200 || !Number.isFinite(quantity) || quantity <= 0 || quantity > 10000 || !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 1_000_000_000) {
+      const inventoryItemId = row?.inventoryItemId === undefined || row.inventoryItemId === null || row.inventoryItemId === '' ? undefined : row.inventoryItemId;
+      if (itemDescription.length < 1 || itemDescription.length > 200 || !Number.isFinite(quantity) || quantity <= 0 || quantity > 10000 || !Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 1_000_000_000 || (inventoryItemId !== undefined && (typeof inventoryItemId !== 'string' || !/^[0-9a-f-]{36}$/i.test(inventoryItemId)))) {
         response.status(400).json({ error: 'Each item needs a description, positive quantity, and valid unit price.' }); return;
       }
       const total = Math.round(quantity * unitPrice * 100) / 100;
-      invoiceItems.push({ description: itemDescription, quantity, unitPrice: Math.round(unitPrice * 100) / 100, total });
+      invoiceItems.push({ description: itemDescription, quantity, unitPrice: Math.round(unitPrice * 100) / 100, total, ...(typeof inventoryItemId === 'string' ? { inventoryItemId } : {}) });
     }
   }
   const subtotal = invoiceItems ? Math.round(invoiceItems.reduce((sum, item) => sum + item.total, 0) * 100) / 100 : Math.round(parsedAmount * 100) / 100;
@@ -537,6 +538,12 @@ app.post('/api/invoices', async (request, response, next) => {
     const invoice = await createInvoice({ customerId, description: invoiceDescription, items: invoiceItems, amount: subtotal, taxRate: parsedTaxRate, dueDate });
     response.status(201).json(invoice);
   } catch (error) {
+    if (error instanceof Error && /create_bizpilot_invoice_with_inventory|inventory_items|schema cache/i.test(error.message)) {
+      response.status(503).json({ error: 'Product sales need the inventory billing setup. Run database/invoice-inventory.sql in Supabase, then redeploy the API.' }); return;
+    }
+    if (error instanceof Error && /not enough stock|product quantities must be whole|selected (?:inventory )?product/i.test(error.message)) {
+      response.status(409).json({ error: error.message }); return;
+    }
     if (error instanceof Error && error.message === 'Choose a customer from your customer list.') {
       response.status(400).json({ error: error.message });
       return;
