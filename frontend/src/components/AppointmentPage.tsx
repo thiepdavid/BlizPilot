@@ -28,7 +28,7 @@ export function AppointmentPage({ businessName, customers, appointments, service
   onCreate: (input: AppointmentInput) => Promise<void>;
   onStatusChange: (id: string, status: Appointment['status']) => Promise<void>;
   onReschedule: (id: string, startsAt: string, durationMinutes: number) => Promise<void>;
-  onGetBookingPage: () => Promise<string>;
+  onGetBookingPage: (timezone: string) => Promise<string>;
   onGetBookingHours: () => Promise<{ timezone: string; hours: Record<string, { closed?: boolean; open?: string; close?: string }> }>;
   onSaveBookingHours: (hours: BusinessHours) => Promise<void>;
   onSaveBookingTimezone: (timezone: string) => Promise<void>;
@@ -130,7 +130,8 @@ export function AppointmentPage({ businessName, customers, appointments, service
   async function shareBookingPage() {
     setBookingPageSaving(true); setBookingPageError('');
     try {
-      const slug = await onGetBookingPage();
+      const businessTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const slug = await onGetBookingPage(businessTimezone);
       const url = `${window.location.origin}/book/${encodeURIComponent(slug)}`;
       setBookingUrl(url);
       try { await navigator.clipboard.writeText(url); setBookingUrlCopied(true); window.setTimeout(() => setBookingUrlCopied(false), 2200); }

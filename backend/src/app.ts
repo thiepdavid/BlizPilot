@@ -114,10 +114,14 @@ app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
 });
 
 app.post('/api/public-booking/page', businessAuth, async (request, response, next) => {
+  const timezone = request.body?.timezone;
+  if (typeof timezone !== 'string' || timezone.length > 80 || !/^[A-Za-z_+-]+(?:\/[A-Za-z0-9_+.-]+)+$/.test(timezone)) {
+    response.status(400).json({ error: 'Choose a valid business time zone.' }); return;
+  }
   try {
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Public booking pages require a signed-in Supabase business.' }); return; }
-    response.json({ slug: await ensurePublicBookingPage(context) });
+    response.json({ slug: await ensurePublicBookingPage(context, timezone) });
   } catch (error) { next(error); }
 });
 

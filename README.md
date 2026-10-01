@@ -112,6 +112,8 @@ Apply `database/public-booking.sql` once in Supabase SQL Editor. After deploying
 
 After applying `database/public-booking.sql`, run `database/public-booking-hours.sql` in the Supabase SQL Editor. In BizPilot, open **Appointments → Share booking page → Manage hours** to set open days and times. Customers will only be offered available 15-minute start times within those hours, using the business time zone. The default schedule is Monday through Saturday, 9:00 AM–6:00 PM, with Sunday closed.
 
+To initialize new booking pages in the business owner's browser time zone, run `database/public-booking-owner-timezone.sql` after `database/public-booking-hours.sql`. Existing booking pages keep their current time zone; change it under **Manage hours** if needed.
+
 ### Block one-off dates
 
 After applying `database/public-booking-hours.sql`, run `database/public-booking-closures.sql` in the Supabase SQL Editor. Under **Appointments → Share booking page → Manage hours**, add and save holiday or time-off dates. The public booking page will show those dates as closed and the API will reject requests for them.

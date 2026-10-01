@@ -171,8 +171,8 @@ export default function App() {
     setAppointments(current => [...current, decorateAppointment(result)].sort((a, b) => a.startsAt.localeCompare(b.startsAt)));
   }
 
-  async function getPublicBookingPage() {
-    const response = await fetch(`${apiBase}/api/public-booking/page`, { method: 'POST', headers: authHeaders });
+  async function getPublicBookingPage(timezone: string) {
+    const response = await fetch(`${apiBase}/api/public-booking/page`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not create your booking page.');
     return String(result.slug);

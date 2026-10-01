@@ -9,12 +9,12 @@ function anonymousClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export async function ensurePublicBookingPage(context: BusinessContext) {
+export async function ensurePublicBookingPage(context: BusinessContext, timezone: string) {
   const { data: business, error } = await context.client.from('businesses').select('name').eq('id', context.businessId).single();
   if (error) throw new Error(error.message);
   const namePart = String(business.name ?? 'business').normalize('NFKD').replace(/[^\w\s-]/g, '').trim().toLowerCase().replace(/[\s_-]+/g, '-').replace(/^-|-$/g, '').slice(0, 36) || 'business';
   const slug = `${namePart}-${randomUUID().slice(0, 8)}`;
-  const { data, error: pageError } = await context.client.rpc('create_public_booking_page', { target_business_id: context.businessId, target_slug: slug });
+  const { data, error: pageError } = await context.client.rpc('create_public_booking_page', { target_business_id: context.businessId, target_slug: slug, target_timezone: timezone });
   if (pageError) throw new Error(pageError.message);
   return String(data);
 }
