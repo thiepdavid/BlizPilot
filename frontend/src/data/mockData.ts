@@ -1,11 +1,5 @@
-import type { Appointment, Customer, Metric } from '../types';
+import type { Appointment, Customer } from '../types';
 
-export const metrics: Metric[] = [
-  { label: 'Sales yesterday', value: '₹18,450', change: '+12.8%', direction: 'up', icon: 'sales' },
-  { label: 'Appointments today', value: '23', change: '+3 from yesterday', direction: 'up', icon: 'appointments' },
-  { label: 'Payments pending', value: '₹7,250', change: '3 invoices overdue', direction: 'down', icon: 'pending' },
-  { label: 'Returning customers', value: '68%', change: '+4.2% this month', direction: 'up', icon: 'customers' },
-];
 
 export const appointments: Appointment[] = [
   { id: '1', customerId: 'demo-1', customer: 'Ananya Sharma', service: 'Haircut & styling', startsAt: new Date(new Date().setHours(9, 30, 0, 0)).toISOString(), durationMinutes: 45, status: 'Completed', initials: 'AS', tone: 'peach' },

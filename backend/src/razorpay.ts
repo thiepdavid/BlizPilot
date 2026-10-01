@@ -10,6 +10,10 @@ export async function createRazorpayPaymentLink(context: BusinessContext, invoic
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) throw new Error('Online payments are not configured yet. Add the Razorpay test keys in Render.');
 
+  const business = await context.client.from('businesses').select('currency_code').eq('id', context.businessId).single();
+  if (business.error) throw new Error(business.error.message);
+  if ((business.data.currency_code ?? 'INR') !== 'INR') throw new Error('Razorpay payment links are currently available for INR businesses only.');
+
   const { data: invoice, error } = await context.client.from('invoices')
     .select('id,business_id,invoice_number,description,total,paid_amount,customers(full_name,email,phone)')
     .eq('id', invoiceId).eq('business_id', context.businessId).maybeSingle();

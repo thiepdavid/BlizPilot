@@ -31,6 +31,12 @@ export async function saveBusinessBookingHours(context: BusinessContext, hours: 
   return data;
 }
 
+export async function saveBusinessBookingTimezone(context: BusinessContext, timezone: string) {
+  const { data, error } = await context.client.rpc('save_business_booking_timezone', { target_business_id: context.businessId, target_timezone: timezone });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
 export async function getBusinessBookingClosures(context: BusinessContext) {
   const { data, error } = await context.client.rpc('get_business_booking_closures', { target_business_id: context.businessId });
   if (error) throw new Error(error.message);

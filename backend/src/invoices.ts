@@ -36,7 +36,7 @@ export async function listInvoices(): Promise<InvoiceRecord[]> {
   return (await readStore()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export async function createInvoice(input: { customerId: string; description: string; amount: number; gstRate: number; dueDate: string }): Promise<InvoiceRecord> {
+export async function createInvoice(input: { customerId: string; description: string; amount: number; taxRate: number; dueDate: string }): Promise<InvoiceRecord> {
   const customer = (await listCustomers()).find(item => item.id === input.customerId);
   if (!customer) throw new Error('Choose a customer from your customer list.');
   let created!: InvoiceRecord;
@@ -44,7 +44,7 @@ export async function createInvoice(input: { customerId: string; description: st
     const invoices = await readStore();
     const year = new Date().getFullYear();
     const sequence = invoices.filter(invoice => invoice.invoiceNumber.startsWith(`BP-${year}-`)).length + 1;
-    const tax = Math.round(input.amount * input.gstRate) / 100;
+    const tax = Math.round(input.amount * input.taxRate) / 100;
     created = { id: crypto.randomUUID(), businessId: customer.businessId, invoiceNumber: `BP-${year}-${String(sequence).padStart(4, '0')}`, customerId: customer.id, customerName: customer.name, description: input.description, subtotal: input.amount, tax, amount: input.amount + tax, paidAmount: 0, dueDate: input.dueDate, status: 'Unpaid', createdAt: new Date().toISOString() };
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify([...invoices, created], null, 2)}\n`, 'utf8');

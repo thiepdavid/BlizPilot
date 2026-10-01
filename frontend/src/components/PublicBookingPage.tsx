@@ -1,10 +1,11 @@
+import { formatCurrency } from '../lib/currency';
 import { useEffect, useState, type FormEvent } from 'react';
 import { CalendarDays, CheckCircle2, Clock3, Store } from 'lucide-react';
 import './public-booking.css';
 
 type PublicService = { id: string; name: string; description: string; durationMinutes: number; price: number };
 type DayHours = { closed?: boolean; open?: string; close?: string };
-type BookingInfo = { businessName: string; timezone: string; hours: Record<string, DayHours>; closedDates: string[]; services: PublicService[] };
+type BookingInfo = { businessName: string; currencyCode?: string; timezone: string; hours: Record<string, DayHours>; closedDates: string[]; services: PublicService[] };
 
 function currentDateInZone(timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
@@ -124,7 +125,7 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
     {loading ? <p className="public-booking-status">Opening booking page…</p> : loadError ? <div className="public-booking-message"><h1>Booking page unavailable</h1><p>{loadError}</p></div> : requested ? <div className="public-booking-success"><CheckCircle2 size={42}/><h1>Request sent</h1><p>Your request for <strong>{requested.service}</strong> has been sent to {page?.businessName}. It is pending confirmation; the business will contact you.</p><div><CalendarDays size={16}/>{new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short', timeZone: page?.timezone }).format(new Date(requested.startsAt))}</div><button className="public-booking-submit" onClick={() => setRequested(null)}>Request another appointment</button></div> : <>
       <div className="public-booking-heading"><div className="public-booking-eyebrow">ONLINE APPOINTMENT REQUEST</div><h1>Book with {page?.businessName}</h1><p>Choose a service and a time during opening hours.</p></div>
       {!page?.services.length ? <div className="public-booking-message"><h2>No services available yet</h2><p>Please contact the business to arrange an appointment.</p></div> : <form className="public-booking-form" onSubmit={submit}>
-        <label>Service<select name="serviceId" value={serviceId} onChange={event => { setServiceId(event.target.value); setRequestedTime(''); }} required>{page.services.map(service => <option key={service.id} value={service.id}>{service.name} · ₹{service.price.toLocaleString('en-IN')} · {service.durationMinutes} min</option>)}</select></label>
+        <label>Service<select name="serviceId" value={serviceId} onChange={event => { setServiceId(event.target.value); setRequestedTime(''); }} required>{page.services.map(service => <option key={service.id} value={service.id}>{service.name} · {formatCurrency(service.price, 2, page.currencyCode ?? 'INR')} · {service.durationMinutes} min</option>)}</select></label>
         {chosenService?.description && <p className="public-service-description">{chosenService.description}</p>}
         <label>Your name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Full name"/></label>
         <div className="public-contact-grid"><label>Phone<input name="phone" type="tel" maxLength={40} autoComplete="tel" placeholder="Phone number"/></label><label>Email<input name="email" type="email" maxLength={254} autoComplete="email" placeholder="Email address"/></label></div>

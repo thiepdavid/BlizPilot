@@ -44,11 +44,11 @@ export async function cloudListInvoices(context: BusinessContext) {
   return data.map((row: Row) => invoiceView(row));
 }
 
-export async function cloudCreateInvoice(context: BusinessContext, input: { customerId: string; description: string; amount: number; gstRate: number; dueDate: string }) {
+export async function cloudCreateInvoice(context: BusinessContext, input: { customerId: string; description: string; amount: number; taxRate: number; dueDate: string }) {
   const { data: customer, error: customerError } = await context.client.from('customers').select('id').eq('id', input.customerId).eq('business_id', context.businessId).maybeSingle();
   if (customerError || !customer) throw new Error('Choose a customer from your customer list.');
   const year = new Date().getFullYear();
-  const tax = Math.round(input.amount * input.gstRate) / 100;
+  const tax = Math.round(input.amount * input.taxRate) / 100;
   const total = input.amount + tax;
   const invoiceNumber = `BP-${year}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
   const data = check(await context.client.from('invoices').insert({ business_id: context.businessId, customer_id: input.customerId, invoice_number: invoiceNumber, description: input.description, subtotal: input.amount, tax, total, due_date: input.dueDate, status: 'sent' }).select('id,business_id,invoice_number,customer_id,description,subtotal,tax,total,paid_amount,due_date,status,created_at,customers(full_name)').single()) as Row;
@@ -108,10 +108,28 @@ export async function cloudUpdateCustomer(context: BusinessContext, customerId: 
   return { id: data.id, businessId: data.business_id, name: data.full_name, email: data.email ?? '', phone: data.phone ?? '', notes: data.notes ?? '', visits: 0, lastVisit: '—', createdAt: data.created_at };
 }
 
-export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string }) {
-  const business = check(await context.client.from('businesses').update({ name: input.businessName, updated_at: new Date().toISOString() }).eq('id', context.businessId).select('id,name').single()) as Row;
+export async function cloudGetBusinessProfile(context: BusinessContext) {
+  const business = check(await context.client.from('businesses').select('name,currency_code').eq('id', context.businessId).single()) as Row;
+  const profile = check(await context.client.from('users').select('full_name').eq('id', context.userId).single()) as Row;
+  return { businessName: business.name, fullName: profile.full_name ?? '', currencyCode: business.currency_code ?? 'INR' };
+}
+
+export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string; currencyCode: string }) {
+  const current = check(await context.client.from('businesses').select('currency_code').eq('id', context.businessId).single()) as Row;
+  if ((current.currency_code ?? 'INR') !== input.currencyCode) {
+    const checks = await Promise.all([
+      context.client.from('services').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
+      context.client.from('invoices').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
+      context.client.from('payments').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
+      context.client.from('expenses').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
+    ]);
+    const failed = checks.find(result => result.error);
+    if (failed?.error) throw new Error(failed.error.message);
+    if (checks.some(result => (result.count ?? 0) > 0)) throw new Error('Business currency is locked after prices or financial records have been added. Existing amounts are not converted.');
+  }
+  const business = check(await context.client.from('businesses').update({ name: input.businessName, currency_code: input.currencyCode, updated_at: new Date().toISOString() }).eq('id', context.businessId).select('id,name,currency_code').single()) as Row;
   const profile = check(await context.client.from('users').update({ full_name: input.fullName, updated_at: new Date().toISOString() }).eq('id', context.userId).select('id,full_name').single()) as Row;
-  return { businessName: business.name, fullName: profile.full_name };
+  return { businessName: business.name, fullName: profile.full_name, currencyCode: business.currency_code };
 }
 
 export async function cloudListCampaigns(context: BusinessContext) {

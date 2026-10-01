@@ -10,8 +10,8 @@ import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from '.
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
-import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours } from './publicBooking.js';
-import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
+import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
+import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
 
 export const app = express();
 app.set('trust proxy', 1);
@@ -47,9 +47,9 @@ app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
   }) : [];
 
   try {
-    const [customers, appointments, invoices, payments, expenses] = context
-      ? await Promise.all([cloudListCustomers(context), cloudListAppointments(context), cloudListInvoices(context), cloudListPayments(context), cloudListExpenses(context)])
-      : await Promise.all([listCustomers(), listAppointments(), listInvoices(), listPayments(), listExpenses()]);
+    const [customers, appointments, invoices, payments, expenses, business] = context
+      ? await Promise.all([cloudListCustomers(context), cloudListAppointments(context), cloudListInvoices(context), cloudListPayments(context), cloudListExpenses(context), cloudGetBusinessProfile(context)])
+      : await Promise.all([listCustomers(), listAppointments(), listInvoices(), listPayments(), listExpenses(), Promise.resolve({ currencyCode: 'INR' })]);
     const today = new Date();
     const todayKey = today.toISOString().slice(0, 10);
     const day = 86_400_000;
@@ -64,12 +64,12 @@ app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
     const completed = appointments.filter(item => item.status === 'Completed');
     const repeatCustomers = new Set(completed.reduce<string[]>((ids, item) => [...ids, item.customerId], []).filter((id, index, ids) => ids.indexOf(id) !== index)).size;
     const snapshot = {
-      period: 'Last 30 days compared with the prior 30 days',
+      period: 'Last 30 days compared with the prior 30 days', currencyCode: business.currencyCode ?? 'INR',
       customers: { total: customers.length, withMultipleCompletedVisits: repeatCustomers },
       appointments: { last30Days: recentAppointments.length, completedLast30Days: recentAppointments.filter(item => item.status === 'Completed').length, pendingUpcoming: appointments.filter(item => item.status === 'Pending' && Date.parse(item.startsAt) >= currentTime).length },
-      invoices: { totalOutstandingINR: Math.round(outstanding * 100) / 100, overdueINR: Math.round(overdue * 100) / 100 },
-      paymentsINR: { last30Days: Math.round(paymentTotal(startCurrent) * 100) / 100, prior30Days: Math.round(paymentTotal(startPrevious) * 100) / 100 },
-      expensesINR: { last30Days: Math.round(expenseTotal(startCurrent) * 100) / 100, prior30Days: Math.round(expenseTotal(startPrevious) * 100) / 100 },
+      invoices: { totalOutstanding: Math.round(outstanding * 100) / 100, overdue: Math.round(overdue * 100) / 100 },
+      payments: { last30Days: Math.round(paymentTotal(startCurrent) * 100) / 100, prior30Days: Math.round(paymentTotal(startPrevious) * 100) / 100 },
+      expenses: { last30Days: Math.round(expenseTotal(startCurrent) * 100) / 100, prior30Days: Math.round(expenseTotal(startPrevious) * 100) / 100 },
     };
     const upstream = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -77,7 +77,7 @@ app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
       signal: AbortSignal.timeout(30_000),
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna',
-        instructions: 'You are BizPilot, a practical assistant for a small service business in India. Answer using the supplied aggregate business snapshot and conversation only. The snapshot intentionally excludes customer names, contact information, private notes, and individual records. Never claim to have seen those details. If the snapshot lacks information, say so plainly. Use INR for amounts, concise plain language, and give a clear next step when useful. Do not invent metrics or give tax, legal, medical, or investment advice.',
+        instructions: 'You are BizPilot, a practical assistant for a small service business anywhere in the world. Answer using the supplied aggregate business snapshot and conversation only. The snapshot intentionally excludes customer names, contact information, private notes, and individual records. Never claim to have seen those details. If the snapshot lacks information, say so plainly. Use the snapshot currencyCode for amounts, concise plain language, and give a clear next step when useful. Do not invent metrics or give tax, legal, medical, or investment advice.',
         input: JSON.stringify({ businessSnapshot: snapshot, recentConversation: priorTurns, question: message.trim() }),
         max_output_tokens: 500,
       }),
@@ -121,6 +121,18 @@ app.patch('/api/public-booking/hours', businessAuth, async (request, response, n
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Business hours require a signed-in Supabase business.' }); return; }
     response.json(await saveBusinessBookingHours(context, hours as Record<string, unknown>));
+  } catch (error) { next(error); }
+});
+
+app.patch('/api/public-booking/timezone', businessAuth, async (request, response, next) => {
+  const timezone = request.body?.timezone;
+  if (typeof timezone !== 'string' || timezone.length > 80 || !/^[A-Za-z_+-]+(?:\/[A-Za-z0-9_+.-]+)+$/.test(timezone)) {
+    response.status(400).json({ error: 'Choose a valid time zone.' }); return;
+  }
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Business time zones require a signed-in Supabase business.' }); return; }
+    response.json({ timezone: await saveBusinessBookingTimezone(context, timezone) });
   } catch (error) { next(error); }
 });
 
@@ -224,15 +236,25 @@ app.patch('/api/campaigns/:id', async (request, response, next) => {
 });
 
 app.use('/api/business-profile', businessAuth);
+app.get('/api/business-profile', async (request, response, next) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    response.json(context ? await cloudGetBusinessProfile(context) : { currencyCode: 'INR' });
+  } catch (error) { next(error); }
+});
 app.patch('/api/business-profile', async (request, response, next) => {
-  const { businessName, fullName } = request.body as { businessName?: unknown; fullName?: unknown };
-  if (typeof businessName !== 'string' || businessName.trim().length < 2 || typeof fullName !== 'string' || fullName.trim().length < 2) {
-    response.status(400).json({ error: 'Enter a business name and owner name with at least 2 characters.' }); return;
+  const { businessName, fullName, currencyCode } = request.body as { businessName?: unknown; fullName?: unknown; currencyCode?: unknown };
+  let validCurrency = false;
+  if (typeof currencyCode === 'string' && /^[A-Z]{3}$/.test(currencyCode)) {
+    try { new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode }).format(0); validCurrency = true; } catch { /* Invalid ISO 4217 code. */ }
+  }
+  if (typeof businessName !== 'string' || businessName.trim().length < 2 || typeof fullName !== 'string' || fullName.trim().length < 2 || !validCurrency) {
+    response.status(400).json({ error: 'Enter a business name, owner name, and valid three-letter currency code.' }); return;
   }
   try {
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Business profile updates require a signed-in cloud account.' }); return; }
-    response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim() }));
+    response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim(), currencyCode: currencyCode as string }));
   } catch (error) { next(error); }
 });
 
@@ -411,17 +433,17 @@ app.get('/api/invoices', async (request, response, next) => {
 });
 
 app.post('/api/invoices', async (request, response, next) => {
-  const { customerId, description, amount, gstRate, dueDate } = request.body as { customerId?: unknown; description?: unknown; amount?: unknown; gstRate?: unknown; dueDate?: unknown };
+  const { customerId, description, amount, taxRate, dueDate } = request.body as { customerId?: unknown; description?: unknown; amount?: unknown; taxRate?: unknown; dueDate?: unknown };
   const parsedAmount = Number(amount);
-  const parsedGstRate = gstRate === undefined ? 0 : Number(gstRate);
-  if (typeof customerId !== 'string' || typeof description !== 'string' || description.trim().length < 2 || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !Number.isFinite(parsedGstRate) || parsedGstRate < 0 || parsedGstRate > 28 || typeof dueDate !== 'string' || Number.isNaN(Date.parse(dueDate))) {
+  const parsedTaxRate = taxRate === undefined ? 0 : Number(taxRate);
+  if (typeof customerId !== 'string' || typeof description !== 'string' || description.trim().length < 2 || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !Number.isFinite(parsedTaxRate) || parsedTaxRate < 0 || parsedTaxRate > 100 || typeof dueDate !== 'string' || Number.isNaN(Date.parse(dueDate))) {
     response.status(400).json({ error: 'Enter a customer, invoice description, positive amount, and valid due date.' });
     return;
   }
   try {
     const cloud = (request as AuthenticatedRequest).businessContext;
-    if (cloud) { response.status(201).json(await cloudCreateInvoice(cloud, { customerId, description: description.trim(), amount: Math.round(parsedAmount * 100) / 100, gstRate: parsedGstRate, dueDate })); return; }
-    const invoice = await createInvoice({ customerId, description: description.trim(), amount: Math.round(parsedAmount * 100) / 100, gstRate: parsedGstRate, dueDate });
+    if (cloud) { response.status(201).json(await cloudCreateInvoice(cloud, { customerId, description: description.trim(), amount: Math.round(parsedAmount * 100) / 100, taxRate: parsedTaxRate, dueDate })); return; }
+    const invoice = await createInvoice({ customerId, description: description.trim(), amount: Math.round(parsedAmount * 100) / 100, taxRate: parsedTaxRate, dueDate });
     response.status(201).json(invoice);
   } catch (error) {
     if (error instanceof Error && error.message === 'Choose a customer from your customer list.') {
@@ -457,7 +479,7 @@ app.post('/api/payments/link', async (request, response, next) => {
       response.status(503).json({ error: error.message });
       return;
     }
-    if (error instanceof Error && (error.message.includes('invoice') || error.message.includes('balance'))) {
+    if (error instanceof Error && (error.message.includes('invoice') || error.message.includes('balance') || error.message.includes('Razorpay payment links'))) {
       response.status(400).json({ error: error.message });
       return;
     }

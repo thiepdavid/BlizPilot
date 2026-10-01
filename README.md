@@ -129,3 +129,8 @@ Before deploying the customer-notes update, run `database/customer-notes.sql` on
 ### Ask BizPilot AI
 
 Add `OPENAI_API_KEY` to the backend environment (local `backend/.env` or Render → `bizpilot-api` → Environment). The key stays on the backend and must never be added to Vercel or a `VITE_` variable. `OPENAI_MODEL` defaults to `gpt-5.6-luna`. Each question sends aggregate business totals and the question to OpenAI; customer names, phone numbers, email addresses, and private notes are excluded. OpenAI API usage may incur charges based on your account and model.
+
+
+### Business currency
+
+After `database/public-booking-closures.sql`, run `database/business-currency.sql` in the Supabase SQL Editor before deploying this update. In **Settings → Business profile**, choose your business accounting currency. BizPilot formats service prices, invoices, payments, expenses, and reports in that currency. It does not convert existing amounts; the API prevents changing the currency after prices or financial records exist. The public booking page uses the business currency too. Razorpay payment links remain INR-only. Customer-specific local currency conversion is not included yet and will require exchange-rate data.
