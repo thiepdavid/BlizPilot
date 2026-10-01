@@ -19,6 +19,7 @@ const timezoneOptions = (() => {
   const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] };
   return intl.supportedValuesOf?.('timeZone') ?? ['America/Los_Angeles', 'America/New_York', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Australia/Sydney', 'Europe/London', 'Europe/Paris', 'Pacific/Auckland', 'UTC'];
 })();
+const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const defaultHours: BusinessHours = Object.fromEntries(weekdayNames.map((_, day) => [String(day), { closed: day === 0, open: '09:00', close: '18:00' }]));
 export function AppointmentPage({ businessName, customers, appointments, services, onCreate, onStatusChange, onReschedule, onGetBookingPage, onGetBookingHours, onSaveBookingHours, onSaveBookingTimezone, onGetClosedDates, onSaveClosedDates, prefillCustomerId, onPrefillHandled }: {
   businessName: string;
@@ -56,7 +57,7 @@ export function AppointmentPage({ businessName, customers, appointments, service
   const [bookingUrlCopied, setBookingUrlCopied] = useState(false);
   const [hoursOpen, setHoursOpen] = useState(false);
   const [hours, setHours] = useState<BusinessHours>(defaultHours);
-  const [hoursTimezone, setHoursTimezone] = useState('Asia/Kolkata');
+  const [hoursTimezone, setHoursTimezone] = useState(browserTimezone);
   const [hoursLoading, setHoursLoading] = useState(false);
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hoursError, setHoursError] = useState('');
@@ -144,7 +145,7 @@ export function AppointmentPage({ businessName, customers, appointments, service
     setHoursOpen(true); setHoursLoading(true); setHoursError(''); setHoursSaved(false);
     try {
       const [result, savedClosedDates] = await Promise.all([onGetBookingHours(), onGetClosedDates()]);
-      setHoursTimezone(result.timezone || 'Asia/Kolkata');
+      setHoursTimezone(result.timezone || browserTimezone());
       setHours(Object.fromEntries(weekdayNames.map((_, day) => {
         const saved = result.hours[String(day)];
         return [String(day), { closed: saved?.closed === true, open: saved?.open ?? '09:00', close: saved?.close ?? '18:00' }];

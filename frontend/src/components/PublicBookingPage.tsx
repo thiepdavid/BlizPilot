@@ -95,7 +95,7 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
         if (!response.ok) throw new Error(data.error ?? 'This booking page could not be opened.');
         return data as BookingInfo;
       })
-      .then(data => { if (current) { setPage(data); setServiceId(data.services[0]?.id ?? ''); setRequestedDate(currentDateInZone(data.timezone || 'Asia/Kolkata')); setDisplayCurrency(initialDisplayCurrency(data.currencyCode ?? 'INR')); } })
+      .then(data => { if (current) { setPage(data); setServiceId(data.services[0]?.id ?? ''); setRequestedDate(currentDateInZone(data.timezone || 'UTC')); setDisplayCurrency(initialDisplayCurrency(data.currencyCode ?? 'INR')); } })
       .catch(reason => { if (current) setLoadError(reason instanceof Error ? reason.message : 'This booking page could not be opened.'); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
@@ -147,14 +147,14 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
   }, [apiBase, slug, requestedDate, page?.timezone]);
 
   const chosenService = page?.services.find(item => item.id === serviceId);
-  const slots = page && chosenService && !busyLoading && !busyError ? timeOptions(requestedDate, page.hours, page.closedDates ?? [], busyTimes, chosenService.durationMinutes, page.timezone || 'Asia/Kolkata') : [];
+  const slots = page && chosenService && !busyLoading && !busyError ? timeOptions(requestedDate, page.hours, page.closedDates ?? [], busyTimes, chosenService.durationMinutes, page.timezone || 'UTC') : [];
   const dateClosed = Boolean(page && (page.closedDates ?? []).includes(requestedDate));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!page || !chosenService || !requestedDate || !requestedTime) { setError('Choose an available appointment time.'); return; }
     const form = new FormData(event.currentTarget);
-    const startsAt = zonedDateTimeToIso(requestedDate, requestedTime, page.timezone || 'Asia/Kolkata');
+    const startsAt = zonedDateTimeToIso(requestedDate, requestedTime, page.timezone || 'UTC');
     setError(''); setSaving(true);
     try {
       const response = await fetch(`${apiBase}/api/public-booking/${encodeURIComponent(slug)}/request`, {
@@ -169,7 +169,7 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
     finally { setSaving(false); }
   }
 
-  const today = page ? currentDateInZone(page.timezone || 'Asia/Kolkata') : '';
+  const today = page ? currentDateInZone(page.timezone || 'UTC') : '';
   const lastDate = today ? dateInDays(today, 90) : undefined;
 
   return <main className="public-booking-screen"><section className="public-booking-card">
@@ -178,7 +178,7 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
       <div className="public-booking-heading"><div className="public-booking-eyebrow">ONLINE APPOINTMENT REQUEST</div><h1>Book with {page?.businessName}</h1><p>Choose a service and a time during opening hours.</p></div>
       {!page?.services.length ? <div className="public-booking-message"><h2>No services available yet</h2><p>Please contact the business to arrange an appointment.</p></div> : <form className="public-booking-form" onSubmit={submit}>
         <label>Show prices in<select value={displayCurrency || page.currencyCode || 'INR'} onChange={event => changeDisplayCurrency(event.target.value)}>{supportedCurrencies.map(code => <option key={code} value={code}>{code} — {currencyName(code)}</option>)}</select></label>
-        {displayCurrency !== (page.currencyCode ?? 'INR') && <p className="public-contact-help" role="status">{currencyRate ? `Approximate price using rates dated ${currencyRate.date}. The business charges in ${page.currencyCode ?? 'INR'}.` : currencyRateError ? `Local conversion is unavailable right now. Prices are shown in ${page.currencyCode ?? 'INR'}.` : 'Loading the latest exchange rate…'}</p>}
+        {displayCurrency !== (page.currencyCode ?? 'INR') && <p className="public-contact-help" role="status">{currencyRate ? `Approximate price using rates dated ${currencyRate.date}. The business charges in ${page.currencyCode ?? 'INR'}.` : currencyRateError ? `Local conversion is unavailable right now. Prices are shown in ${page.currencyCode ?? 'INR'}.` : 'Loading a daily reference rate…'}</p>}
         <label>Service<select name="serviceId" value={serviceId} onChange={event => { setServiceId(event.target.value); setRequestedTime(''); }} required>{page.services.map(service => <option key={service.id} value={service.id}>{service.name} · {priceLabel(service.price)} · {service.durationMinutes} min</option>)}</select></label>
         {chosenService?.description && <p className="public-service-description">{chosenService.description}</p>}
         <label>Your name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Full name"/></label>

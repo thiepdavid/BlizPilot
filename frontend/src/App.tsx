@@ -81,8 +81,8 @@ export default function App() {
     return () => { current = false; };
   }, [apiBase, session?.access_token, backendDataMode]);
   const metadata = session?.user.user_metadata ?? {};
-  const accountName = (!supabase && profileOverrides?.fullName) || (typeof metadata.full_name === 'string' && metadata.full_name.trim()) || session?.user.email?.split('@')[0] || 'Rahul Sharma';
-  const businessName = (!supabase && profileOverrides?.businessName) || (typeof metadata.business_name === 'string' && metadata.business_name.trim()) || (session ? 'My Business' : 'Studio Saanvi');
+  const accountName = (!supabase && profileOverrides?.fullName) || (typeof metadata.full_name === 'string' && metadata.full_name.trim()) || session?.user.email?.split('@')[0] || 'Alex Morgan';
+  const businessName = (!supabase && profileOverrides?.businessName) || (typeof metadata.business_name === 'string' && metadata.business_name.trim()) || (session ? 'My Business' : 'Brightside Studio');
   const firstName = accountName.split(/\s+/)[0] || 'there';
   const businessInitial = businessName.charAt(0).toUpperCase() || 'B';
   const accountInitial = accountName.charAt(0).toUpperCase() || 'U';
