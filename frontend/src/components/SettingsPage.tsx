@@ -21,10 +21,63 @@ type BusinessProfileInput = BusinessLocation & {
 };
 
 type GeoapifyFeature = { properties: {
-  place_id: string; name?: string; formatted?: string; address_line1?: string; housenumber?: string; street?: string;
+  place_id?: string; name?: string; formatted?: string; address_line1?: string; housenumber?: string; street?: string;
   city?: string; town?: string; village?: string; municipality?: string; district?: string; suburb?: string;
   neighbourhood?: string; county?: string; state?: string; province?: string; region?: string; postcode?: string;
 } };
+type LocationField = 'address' | 'city' | 'district' | 'region' | 'postalCode';
+
+function LocationAutocompleteInput({ field, value, onChange, onChoose, country, region, apiKey, placeholder, autoComplete }: {
+  field: LocationField; value: string; onChange: (value: string) => void;
+  onChoose: (feature: GeoapifyFeature) => void; country: string; region: string; apiKey: string;
+  placeholder?: string; autoComplete: string;
+}) {
+  const [suggestions, setSuggestions] = useState<GeoapifyFeature[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!apiKey || !country || value.trim().length < 2 || !open) {
+      setSuggestions([]); setLoading(false); return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLoading(true); setError('');
+      try {
+        const searchText = field !== 'region' && region.trim() ? `${value.trim()}, ${region.trim()}` : value.trim();
+        const params = new URLSearchParams({ text: searchText, filter: `countrycode:${country.toLowerCase()}`, format: 'geojson', limit: '5', apiKey });
+        const type = field === 'city' ? 'city' : field === 'district' ? 'locality' : field === 'region' ? 'state' : field === 'postalCode' ? 'postcode' : '';
+        if (type) params.set('type', type);
+        const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params}`, { signal: controller.signal });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({})) as { message?: string; reason?: string; error?: string };
+          const detail = payload.message || payload.reason || payload.error;
+          const hint = response.status === 401 || response.status === 403 ? ' Check the key and allowed origins.' : response.status === 429 ? ' Try again later.' : '';
+          throw new Error(`Geoapify request failed (HTTP ${response.status})${detail ? `: ${detail}` : '.'}${hint}`);
+        }
+        const result = await response.json() as { features?: GeoapifyFeature[] };
+        setSuggestions(result.features ?? []);
+      } catch (reason) {
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+          setError(reason instanceof TypeError ? 'Could not reach Geoapify. Check allowed origins and CORS.' : reason instanceof Error ? reason.message : 'Address search failed.');
+        }
+      } finally { if (!controller.signal.aborted) setLoading(false); }
+    }, 300);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [apiKey, country, field, open, region, value]);
+
+  const id = `location-${field}`;
+  return <div className="location-autocomplete">
+    <input id={id} name={field === 'address' ? 'addressLine1' : field === 'postalCode' ? 'postalCode' : field} maxLength={field === 'postalCode' ? 30 : 200} value={value} onChange={event => { onChange(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} placeholder={placeholder} autoComplete={autoComplete} aria-autocomplete="list" aria-expanded={open && suggestions.length > 0} aria-controls={`${id}-suggestions`}/>
+    {open && (loading || error || suggestions.length > 0 || (apiKey && value.trim().length >= 2)) && <div className="location-autocomplete-status">
+      {loading && <small>Searching…</small>}
+      {error && <small className="address-search-error" role="alert">{error}</small>}
+      {!loading && !error && suggestions.length === 0 && apiKey && value.trim().length >= 2 && <small>No matching suggestions. You can keep typing.</small>}
+      {suggestions.length > 0 && <div className="address-suggestions" id={`${id}-suggestions`} role="listbox">{suggestions.map((feature, index) => <button type="button" role="option" key={feature.properties.place_id ?? `${feature.properties.formatted}-${index}`} onMouseDown={event => event.preventDefault()} onClick={() => { onChoose(feature); setSuggestions([]); setOpen(false); }}><strong>{feature.properties.name || feature.properties.address_line1 || feature.properties.formatted}</strong>{feature.properties.formatted && <span>{feature.properties.formatted}</span>}</button>)}</div>}
+    </div>}
+  </div>;
+}
 
 export function SettingsPage({ businessName, fullName, currencyCode, location, onSave }: {
   businessName: string;
@@ -43,10 +96,6 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
   const [district, setDistrict] = useState(location.district);
   const [region, setRegion] = useState(location.region);
   const [postalCode, setPostalCode] = useState(location.postalCode);
-  const [addressSearch, setAddressSearch] = useState('');
-  const [addressSuggestions, setAddressSuggestions] = useState<GeoapifyFeature[]>([]);
-  const [addressLoading, setAddressLoading] = useState(false);
-  const [addressError, setAddressError] = useState('');
   const geoapifyKey = import.meta.env.VITE_GEOAPIFY_API_KEY?.trim() ?? '';
   useEffect(() => setCurrencyDraft(currencyCode), [currencyCode]);
   useEffect(() => setCountryDraft(countryCode(location.country)), [location.country]);
@@ -56,45 +105,13 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
   }, [location.addressLine1, location.city, location.district, location.region, location.postalCode]);
   const fields = countryFields(countryDraft);
 
-  useEffect(() => {
-    if (!geoapifyKey || !countryDraft || addressSearch.trim().length < 3) {
-      setAddressSuggestions([]); setAddressLoading(false); return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setAddressLoading(true); setAddressError('');
-      try {
-        const query = new URLSearchParams({ text: addressSearch.trim(), filter: `countrycode:${countryDraft.toLowerCase()}`, format: 'geojson', limit: '7', apiKey: geoapifyKey });
-        const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${query}`, { signal: controller.signal });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({})) as { message?: string; reason?: string; error?: string };
-          const detail = payload.message || payload.reason || payload.error;
-          const hint = response.status === 401 || response.status === 403 ? ' Check the key value and Geoapify allowed origins.' : response.status === 429 ? ' Geoapify request limit reached; try again later.' : '';
-          throw new Error(`Geoapify request failed (HTTP ${response.status})${detail ? `: ${detail}` : '.'}${hint}`);
-        }
-        const result = await response.json() as { features?: GeoapifyFeature[] };
-        setAddressSuggestions(result.features ?? []);
-      } catch (reason) {
-        if (!controller.signal.aborted) {
-          setAddressSuggestions([]);
-          setAddressError(reason instanceof TypeError ? 'Could not reach Geoapify. Check the allowed origin and CORS settings for this website.' : reason instanceof Error ? reason.message : 'Address search request failed.');
-        }
-      } finally { if (!controller.signal.aborted) setAddressLoading(false); }
-    }, 350);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [addressSearch, countryDraft, geoapifyKey]);
-
-  function chooseAddress(feature: GeoapifyFeature) {
+  function chooseLocation(field: LocationField, feature: GeoapifyFeature) {
     const place = feature.properties;
-    const locality = place.city || place.town || place.village || place.municipality || '';
-    setAddressLine1([place.housenumber, place.street].filter(Boolean).join(' ') || place.address_line1 || '');
-    setCity(locality);
-    setDistrict(place.district || place.suburb || place.neighbourhood || place.county || '');
-    setRegion(place.state || place.province || place.region || '');
-    setPostalCode(place.postcode || '');
-    setAddressSearch(place.formatted || '');
-    setAddressSuggestions([]);
-    setAddressError('');
+    if (field === 'address') setAddressLine1([place.housenumber, place.street].filter(Boolean).join(' ') || place.address_line1 || place.name || '');
+    if (field === 'city') setCity(place.city || place.town || place.village || place.municipality || place.name || '');
+    if (field === 'district') setDistrict(place.district || place.suburb || place.neighbourhood || place.county || place.name || '');
+    if (field === 'region') setRegion(place.state || place.province || place.region || place.name || '');
+    if (field === 'postalCode') setPostalCode(place.postcode || place.name || '');
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -129,14 +146,13 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
         <label>Business currency<select value={currencyDraft} onChange={event => setCurrencyDraft(event.target.value as CurrencyCode)}>{supportedCurrencies.map(code => <option key={code} value={code}>{code} — {currencyName(code)}</option>)}</select></label>
         <p className="settings-help">Currency applies to business records. It does not convert existing amounts, and is locked after you add prices or financial records.</p>
         <div className="settings-location-fields">
-          <label>Country or region<select name="country" value={countryDraft} onChange={event => { setCountryDraft(event.target.value); setAddressSearch(''); setAddressSuggestions([]); setAddressLine1(''); setCity(''); setDistrict(''); setRegion(''); setPostalCode(''); }}><option value="">Select a country or region</option>{countryOptions.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
-          <div className="business-address-search"><label htmlFor="business-address-search">Find address, city, district, or postal code</label><input id="business-address-search" value={addressSearch} onChange={event => setAddressSearch(event.target.value)} disabled={!countryDraft || !geoapifyKey} placeholder={!countryDraft ? 'Select a country first' : !geoapifyKey ? 'Address search setup required' : 'Start typing a place or address'} autoComplete="off" aria-autocomplete="list" aria-expanded={addressSuggestions.length > 0}/>{addressLoading && <small>Searching locations…</small>}{addressSuggestions.length > 0 && <div className="address-suggestions" role="listbox" aria-label="Address suggestions">{addressSuggestions.map(feature => <button type="button" role="option" key={feature.properties.place_id} onClick={() => chooseAddress(feature)}><strong>{feature.properties.name || feature.properties.address_line1 || feature.properties.formatted}</strong><span>{feature.properties.formatted}</span></button>)}</div>}{geoapifyKey && !addressLoading && !addressError && addressSearch.trim().length >= 3 && addressSuggestions.length === 0 && <small>No matching places found. You can still fill the address fields below.</small>}{addressError && <small className="address-search-error" role="alert">{addressError}</small>}{!geoapifyKey && <small>Add a Geoapify key to enable country-filtered address suggestions. You can still enter each field manually.</small>}{geoapifyKey && <small>Place searches are sent to Geoapify for suggestions.</small>}</div>
-          <label>Business address<input name="addressLine1" maxLength={200} value={addressLine1} onChange={event => setAddressLine1(event.target.value)} placeholder="Street address" autoComplete="street-address"/></label>
+          <label>Country or region<select name="country" value={countryDraft} onChange={event => { setCountryDraft(event.target.value); setAddressLine1(''); setCity(''); setDistrict(''); setRegion(''); setPostalCode(''); }}><option value="">Select a country or region</option>{countryOptions.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
+          <label>Business address<LocationAutocompleteInput field="address" country={countryDraft} region={region} apiKey={geoapifyKey} value={addressLine1} onChange={setAddressLine1} onChoose={feature => chooseLocation('address', feature)} placeholder={countryDraft ? 'Type a street, building, or business' : 'Select a country first'} autoComplete="street-address"/></label>
           <div className="settings-address-row">
-            <label>City or town<input name="city" maxLength={100} value={city} onChange={event => setCity(event.target.value)} autoComplete="address-level2"/></label>
-            <label>District / county<input name="district" maxLength={100} value={district} onChange={event => setDistrict(event.target.value)} autoComplete="address-level3"/></label>
+            <label>City or town<LocationAutocompleteInput field="city" country={countryDraft} region={region} apiKey={geoapifyKey} value={city} onChange={setCity} onChoose={feature => chooseLocation('city', feature)} placeholder={countryDraft ? 'Start typing a city or town' : 'Select a country first'} autoComplete="address-level2"/></label>
+            <label>District / county<LocationAutocompleteInput field="district" country={countryDraft} region={region} apiKey={geoapifyKey} value={district} onChange={setDistrict} onChoose={feature => chooseLocation('district', feature)} placeholder={countryDraft ? 'Start typing a district' : 'Select a country first'} autoComplete="address-level3"/></label>
           </div>
-          <div className="settings-address-row"><label>{fields.regionLabel}<input name="region" maxLength={100} value={region} onChange={event => setRegion(event.target.value)} autoComplete="address-level1"/></label><label>{fields.postalLabel}<input name="postalCode" maxLength={30} value={postalCode} onChange={event => setPostalCode(event.target.value)} autoComplete="postal-code"/></label></div>
+          <div className="settings-address-row"><label>{fields.regionLabel}<LocationAutocompleteInput field="region" country={countryDraft} region={region} apiKey={geoapifyKey} value={region} onChange={setRegion} onChoose={feature => chooseLocation('region', feature)} placeholder={countryDraft ? 'Start typing a region' : 'Select a country first'} autoComplete="address-level1"/></label><label>{fields.postalLabel}<LocationAutocompleteInput field="postalCode" country={countryDraft} region={region} apiKey={geoapifyKey} value={postalCode} onChange={setPostalCode} onChoose={feature => chooseLocation('postalCode', feature)} placeholder={countryDraft ? 'Start typing a code' : 'Select a country first'} autoComplete="postal-code"/></label></div>
           <label>{fields.taxLabel} <span>(optional)</span><input name="taxId" maxLength={100} defaultValue={location.taxId} placeholder={fields.taxLabel}/><small>{fields.taxHint}</small></label>
         </div>
         <p className="settings-help">Field names adapt to the selected country. Whether an address detail or tax number is legally required depends on your business and registration; BizPilot doesn’t determine or validate local tax obligations.</p>
