@@ -66,11 +66,19 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
       try {
         const query = new URLSearchParams({ text: addressSearch.trim(), filter: `countrycode:${countryDraft.toLowerCase()}`, format: 'geojson', limit: '7', apiKey: geoapifyKey });
         const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${query}`, { signal: controller.signal });
-        if (!response.ok) throw new Error('Could not load address suggestions.');
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({})) as { message?: string; reason?: string; error?: string };
+          const detail = payload.message || payload.reason || payload.error;
+          const hint = response.status === 401 || response.status === 403 ? ' Check the key value and Geoapify allowed origins.' : response.status === 429 ? ' Geoapify request limit reached; try again later.' : '';
+          throw new Error(`Geoapify request failed (HTTP ${response.status})${detail ? `: ${detail}` : '.'}${hint}`);
+        }
         const result = await response.json() as { features?: GeoapifyFeature[] };
         setAddressSuggestions(result.features ?? []);
       } catch (reason) {
-        if (!controller.signal.aborted) { setAddressSuggestions([]); setAddressError(reason instanceof Error ? reason.message : 'Could not load address suggestions.'); }
+        if (!controller.signal.aborted) {
+          setAddressSuggestions([]);
+          setAddressError(reason instanceof TypeError ? 'Could not reach Geoapify. Check the allowed origin and CORS settings for this website.' : reason instanceof Error ? reason.message : 'Address search request failed.');
+        }
       } finally { if (!controller.signal.aborted) setAddressLoading(false); }
     }, 350);
     return () => { window.clearTimeout(timer); controller.abort(); };
