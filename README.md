@@ -20,7 +20,7 @@ bizpilot/
 - Service catalog with add, edit, and archive actions
 - Appointment booking, search, date/status filters, status updates, rescheduling, and overlap checks
 - Shareable public booking page; customer requests arrive as pending appointments for owner confirmation
-- Invoice creation with optional GST, invoice preview/print, outstanding balances, and overdue filters
+- Invoice creation with an optional configurable tax rate, invoice preview/print, outstanding balances, and overdue filters
 - Manual payment recording, invoice payment links through Razorpay, webhook-confirmed online payments, and copy-only reminders
 - Expense tracking and month/category reports with CSV export
 - Marketing message drafts that can be edited and copied; BizPilot does not send messages
