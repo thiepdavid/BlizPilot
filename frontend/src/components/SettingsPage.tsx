@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Building2, UserRound } from 'lucide-react';
 import { currencyName, supportedCurrencies, type CurrencyCode } from '../lib/currency';
 import { countryCode, countryFields, countryOptions } from '../lib/countryProfile';
+import type { BusinessType } from '../types';
 import './settings.css';
 
 export type BusinessLocation = {
@@ -18,6 +19,7 @@ type BusinessProfileInput = BusinessLocation & {
   businessName: string;
   fullName: string;
   currencyCode: CurrencyCode;
+  businessType: BusinessType;
 };
 
 type GeoapifyFeature = { properties: {
@@ -87,10 +89,11 @@ function LocationAutocompleteInput({ field, value, onChange, onChoose, country, 
   </div>;
 }
 
-export function SettingsPage({ businessName, fullName, currencyCode, location, onSave }: {
+export function SettingsPage({ businessName, fullName, currencyCode, businessType, location, onSave }: {
   businessName: string;
   fullName: string;
   currencyCode: CurrencyCode;
+  businessType: BusinessType;
   location: BusinessLocation;
   onSave: (input: BusinessProfileInput) => Promise<void>;
 }) {
@@ -98,6 +101,7 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [currencyDraft, setCurrencyDraft] = useState<CurrencyCode>(currencyCode);
+  const [businessTypeDraft, setBusinessTypeDraft] = useState<BusinessType>(businessType);
   const [countryDraft, setCountryDraft] = useState(() => countryCode(location.country));
   const [addressLine1, setAddressLine1] = useState(location.addressLine1);
   const [city, setCity] = useState(location.city);
@@ -106,6 +110,7 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
   const [postalCode, setPostalCode] = useState(location.postalCode);
   const geoapifyKey = import.meta.env.VITE_GEOAPIFY_API_KEY?.trim() ?? '';
   useEffect(() => setCurrencyDraft(currencyCode), [currencyCode]);
+  useEffect(() => setBusinessTypeDraft(businessType), [businessType]);
   useEffect(() => setCountryDraft(countryCode(location.country)), [location.country]);
   useEffect(() => {
     setAddressLine1(location.addressLine1); setCity(location.city); setDistrict(location.district);
@@ -137,6 +142,7 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
         businessName: String(data.get('businessName') ?? '').trim(),
         fullName: String(data.get('fullName') ?? '').trim(),
         currencyCode: currencyDraft,
+        businessType: businessTypeDraft,
         country: countryDraft,
         addressLine1: addressLine1.trim(),
         city: city.trim(),
@@ -157,6 +163,7 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
       <form onSubmit={submit}>
         <label>Business name<span className="settings-input-icon"><Building2 size={14}/></span><input name="businessName" required minLength={2} defaultValue={businessName}/></label>
         <label>Owner name<span className="settings-input-icon"><UserRound size={14}/></span><input name="fullName" required minLength={2} defaultValue={fullName}/></label>
+        <label>What type of business do you run?<select value={businessTypeDraft} onChange={event => setBusinessTypeDraft(event.target.value as BusinessType)}><option value="boutique">Boutique / clothing & fashion</option><option value="restaurant">Restaurant / café</option><option value="salon">Salon / personal services</option><option value="grocery">Grocery / convenience store</option><option value="electronics">Electronics</option><option value="pharmacy">Pharmacy</option><option value="other">Other</option></select><small>This helps BizPilot show the tools that fit your business. You can change it later.</small></label>
         <label>Business currency<select value={currencyDraft} onChange={event => setCurrencyDraft(event.target.value as CurrencyCode)}>{supportedCurrencies.map(code => <option key={code} value={code}>{code} — {currencyName(code)}</option>)}</select></label>
         <p className="settings-help">Currency applies to business records. It does not convert existing amounts, and is locked after you add prices or financial records.</p>
         <div className="settings-location-fields">

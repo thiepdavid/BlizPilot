@@ -72,6 +72,21 @@ export async function cloudListServices(context: BusinessContext) {
   return data.map((row: Row) => ({ id: row.id, businessId: row.business_id, name: row.name, description: row.description ?? '', durationMinutes: row.duration_minutes, price: Number(row.price), isActive: row.is_active, createdAt: row.created_at }));
 }
 
+export async function cloudListInventory(context: BusinessContext) {
+  const data = check(await context.client.from('inventory_items').select('id,business_id,name,category,sku,size,color,cost_price,selling_price,quantity,low_stock_at,created_at').eq('business_id', context.businessId).order('name'));
+  return data.map((row: Row) => ({ id: row.id, businessId: row.business_id, name: row.name, category: row.category ?? '', sku: row.sku ?? '', size: row.size ?? '', color: row.color ?? '', costPrice: Number(row.cost_price), sellingPrice: Number(row.selling_price), quantity: Number(row.quantity), lowStockAt: Number(row.low_stock_at), createdAt: row.created_at }));
+}
+
+export async function cloudCreateInventoryItem(context: BusinessContext, input: { name: string; category: string; sku: string; size: string; color: string; costPrice: number; sellingPrice: number; quantity: number; lowStockAt: number }) {
+  const data = check(await context.client.from('inventory_items').insert({ business_id: context.businessId, name: input.name, category: input.category, sku: input.sku, size: input.size, color: input.color, cost_price: input.costPrice, selling_price: input.sellingPrice, quantity: input.quantity, low_stock_at: input.lowStockAt }).select('id,business_id,name,category,sku,size,color,cost_price,selling_price,quantity,low_stock_at,created_at').single()) as Row;
+  return { id: data.id, businessId: data.business_id, name: data.name, category: data.category ?? '', sku: data.sku ?? '', size: data.size ?? '', color: data.color ?? '', costPrice: Number(data.cost_price), sellingPrice: Number(data.selling_price), quantity: Number(data.quantity), lowStockAt: Number(data.low_stock_at), createdAt: data.created_at };
+}
+
+export async function cloudUpdateInventoryStock(context: BusinessContext, id: string, quantity: number) {
+  const data = check(await context.client.from('inventory_items').update({ quantity, updated_at: new Date().toISOString() }).eq('id', id).eq('business_id', context.businessId).select('id,business_id,name,category,sku,size,color,cost_price,selling_price,quantity,low_stock_at,created_at').single()) as Row;
+  return { id: data.id, businessId: data.business_id, name: data.name, category: data.category ?? '', sku: data.sku ?? '', size: data.size ?? '', color: data.color ?? '', costPrice: Number(data.cost_price), sellingPrice: Number(data.selling_price), quantity: Number(data.quantity), lowStockAt: Number(data.low_stock_at), createdAt: data.created_at };
+}
+
 export async function cloudCreateService(context: BusinessContext, input: { name: string; description: string; durationMinutes: number; price: number }) {
   const data = check(await context.client.from('services').insert({ business_id: context.businessId, name: input.name, description: input.description || null, duration_minutes: input.durationMinutes, price: input.price }).select('id,business_id,name,description,duration_minutes,price,is_active,created_at').single()) as Row;
   return { id: data.id, businessId: data.business_id, name: data.name, description: data.description ?? '', durationMinutes: data.duration_minutes, price: Number(data.price), isActive: data.is_active, createdAt: data.created_at };
@@ -110,12 +125,12 @@ export async function cloudUpdateCustomer(context: BusinessContext, customerId: 
 }
 
 export async function cloudGetBusinessProfile(context: BusinessContext) {
-  const business = check(await context.client.from('businesses').select('name,currency_code,country,address_line1,city,district,region,postal_code,tax_id').eq('id', context.businessId).single()) as Row;
+  const business = check(await context.client.from('businesses').select('name,currency_code,business_type,country,address_line1,city,district,region,postal_code,tax_id').eq('id', context.businessId).single()) as Row;
   const profile = check(await context.client.from('users').select('full_name').eq('id', context.userId).single()) as Row;
-  return { businessName: business.name, fullName: profile.full_name ?? '', currencyCode: business.currency_code ?? 'INR', country: business.country ?? '', addressLine1: business.address_line1 ?? '', city: business.city ?? '', district: business.district ?? '', region: business.region ?? '', postalCode: business.postal_code ?? '', taxId: business.tax_id ?? '' };
+  return { businessName: business.name, fullName: profile.full_name ?? '', currencyCode: business.currency_code ?? 'INR', businessType: business.business_type ?? 'other', country: business.country ?? '', addressLine1: business.address_line1 ?? '', city: business.city ?? '', district: business.district ?? '', region: business.region ?? '', postalCode: business.postal_code ?? '', taxId: business.tax_id ?? '' };
 }
 
-export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string; currencyCode: string; country: string; addressLine1: string; city: string; district: string; region: string; postalCode: string; taxId: string }) {
+export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string; currencyCode: string; businessType: string; country: string; addressLine1: string; city: string; district: string; region: string; postalCode: string; taxId: string }) {
   const current = check(await context.client.from('businesses').select('currency_code').eq('id', context.businessId).single()) as Row;
   if ((current.currency_code ?? 'INR') !== input.currencyCode) {
     const checks = await Promise.all([
@@ -123,14 +138,15 @@ export async function cloudUpdateBusinessProfile(context: BusinessContext, input
       context.client.from('invoices').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
       context.client.from('payments').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
       context.client.from('expenses').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
+      context.client.from('inventory_items').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId),
     ]);
     const failed = checks.find(result => result.error);
     if (failed?.error) throw new Error(failed.error.message);
     if (checks.some(result => (result.count ?? 0) > 0)) throw new Error('Business currency is locked after prices or financial records have been added. Existing amounts are not converted.');
   }
-  const business = check(await context.client.from('businesses').update({ name: input.businessName, currency_code: input.currencyCode, country: input.country || null, address_line1: input.addressLine1 || null, city: input.city || null, district: input.district || null, region: input.region || null, postal_code: input.postalCode || null, tax_id: input.taxId || null, updated_at: new Date().toISOString() }).eq('id', context.businessId).select('id,name,currency_code,country,address_line1,city,district,region,postal_code,tax_id').single()) as Row;
+  const business = check(await context.client.from('businesses').update({ name: input.businessName, currency_code: input.currencyCode, business_type: input.businessType, country: input.country || null, address_line1: input.addressLine1 || null, city: input.city || null, district: input.district || null, region: input.region || null, postal_code: input.postalCode || null, tax_id: input.taxId || null, updated_at: new Date().toISOString() }).eq('id', context.businessId).select('id,name,currency_code,business_type,country,address_line1,city,district,region,postal_code,tax_id').single()) as Row;
   const profile = check(await context.client.from('users').update({ full_name: input.fullName, updated_at: new Date().toISOString() }).eq('id', context.userId).select('id,full_name').single()) as Row;
-  return { businessName: business.name, fullName: profile.full_name, currencyCode: business.currency_code, country: business.country ?? '', addressLine1: business.address_line1 ?? '', city: business.city ?? '', district: business.district ?? '', region: business.region ?? '', postalCode: business.postal_code ?? '', taxId: business.tax_id ?? '' };
+  return { businessName: business.name, fullName: profile.full_name, currencyCode: business.currency_code, businessType: business.business_type ?? 'other', country: business.country ?? '', addressLine1: business.address_line1 ?? '', city: business.city ?? '', district: business.district ?? '', region: business.region ?? '', postalCode: business.postal_code ?? '', taxId: business.tax_id ?? '' };
 }
 
 export async function cloudListCampaigns(context: BusinessContext) {

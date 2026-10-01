@@ -11,8 +11,9 @@ import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
 import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
-import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
+import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
 import { getExchangeRate } from './exchangeRates.js';
+import { createInventoryItem, listInventory, updateInventoryStock } from './inventory.js';
 
 export const app = express();
 app.set('trust proxy', 1);
@@ -267,19 +268,20 @@ app.get('/api/business-profile', async (request, response, next) => {
   } catch (error) { next(error); }
 });
 app.patch('/api/business-profile', async (request, response, next) => {
-  const { businessName, fullName, currencyCode, country = '', addressLine1 = '', city = '', district = '', region = '', postalCode = '', taxId = '' } = request.body as { businessName?: unknown; fullName?: unknown; currencyCode?: unknown; country?: unknown; addressLine1?: unknown; city?: unknown; district?: unknown; region?: unknown; postalCode?: unknown; taxId?: unknown };
+  const { businessName, fullName, currencyCode, businessType = 'other', country = '', addressLine1 = '', city = '', district = '', region = '', postalCode = '', taxId = '' } = request.body as { businessName?: unknown; fullName?: unknown; currencyCode?: unknown; businessType?: unknown; country?: unknown; addressLine1?: unknown; city?: unknown; district?: unknown; region?: unknown; postalCode?: unknown; taxId?: unknown };
+  const validBusinessTypes = ['boutique', 'restaurant', 'salon', 'grocery', 'electronics', 'pharmacy', 'other'];
   let validCurrency = false;
   if (typeof currencyCode === 'string' && /^[A-Z]{3}$/.test(currencyCode)) {
     try { new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode }).format(0); validCurrency = true; } catch { /* Invalid ISO 4217 code. */ }
   }
   const optionalFields = [country, addressLine1, city, district, region, postalCode, taxId];
-  if (typeof businessName !== 'string' || businessName.trim().length < 2 || typeof fullName !== 'string' || fullName.trim().length < 2 || !validCurrency || optionalFields.some(value => typeof value !== 'string' || value.length > 300)) {
+  if (typeof businessName !== 'string' || businessName.trim().length < 2 || typeof fullName !== 'string' || fullName.trim().length < 2 || !validCurrency || typeof businessType !== 'string' || !validBusinessTypes.includes(businessType) || optionalFields.some(value => typeof value !== 'string' || value.length > 300)) {
     response.status(400).json({ error: 'Enter a business name, owner name, and valid three-letter currency code.' }); return;
   }
   try {
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Business profile updates require a signed-in cloud account.' }); return; }
-    response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim(), currencyCode: currencyCode as string, country: (country as string).trim(), addressLine1: (addressLine1 as string).trim(), city: (city as string).trim(), district: (district as string).trim(), region: (region as string).trim(), postalCode: (postalCode as string).trim(), taxId: (taxId as string).trim() }));
+    response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim(), currencyCode: currencyCode as string, businessType, country: (country as string).trim(), addressLine1: (addressLine1 as string).trim(), city: (city as string).trim(), district: (district as string).trim(), region: (region as string).trim(), postalCode: (postalCode as string).trim(), taxId: (taxId as string).trim() }));
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message.startsWith('Business currency is locked')) {
@@ -290,6 +292,9 @@ app.patch('/api/business-profile', async (request, response, next) => {
     }
     if (/column .*?(?:country|address_line1|city|district|region|postal_code|tax_id).* does not exist|(?:country|address_line1|city|district|region|postal_code|tax_id).*schema cache/i.test(message)) {
       response.status(503).json({ error: 'Business location fields are not installed yet. Run database/business-location.sql in Supabase, then redeploy the API.' }); return;
+    }
+    if (/business_type.*(?:does not exist|schema cache)/i.test(message)) {
+      response.status(503).json({ error: 'Business type is not installed yet. Run database/business-type-inventory.sql in Supabase, then redeploy the API.' }); return;
     }
     next(error);
   }
@@ -332,6 +337,35 @@ app.post('/api/services', async (request, response, next) => {
     const cloud = (request as AuthenticatedRequest).businessContext;
     response.status(201).json(cloud ? await cloudCreateService(cloud, input) : await createService(input));
   } catch (error) { next(error); }
+});
+
+app.use('/api/inventory', businessAuth);
+app.get('/api/inventory', async (request, response, next) => {
+  try { const cloud = (request as AuthenticatedRequest).businessContext; response.json(cloud ? await cloudListInventory(cloud) : await listInventory()); }
+  catch (error) { next(error); }
+});
+app.post('/api/inventory', async (request, response, next) => {
+  const { name, category = '', sku = '', size = '', color = '', costPrice, sellingPrice, quantity, lowStockAt = 2 } = request.body as Record<string, unknown>;
+  const cost = Number(costPrice); const price = Number(sellingPrice); const stock = Number(quantity); const lowStock = Number(lowStockAt);
+  const optional = [category, sku, size, color];
+  if (typeof name !== 'string' || name.trim().length < 2 || name.length > 160 || optional.some(value => typeof value !== 'string' || value.length > 100) || !Number.isFinite(cost) || cost < 0 || !Number.isFinite(price) || price < 0 || !Number.isInteger(stock) || stock < 0 || !Number.isInteger(lowStock) || lowStock < 0) {
+    response.status(400).json({ error: 'Enter a product name, valid prices, and whole-number stock values of zero or more.' }); return;
+  }
+  try {
+    const input = { name: name.trim(), category: (category as string).trim(), sku: (sku as string).trim(), size: (size as string).trim(), color: (color as string).trim(), costPrice: Math.round(cost * 100) / 100, sellingPrice: Math.round(price * 100) / 100, quantity: stock, lowStockAt: lowStock };
+    const cloud = (request as AuthenticatedRequest).businessContext;
+    response.status(201).json(cloud ? await cloudCreateInventoryItem(cloud, input) : await createInventoryItem(input));
+  } catch (error) {
+    if (error instanceof Error && /unique|duplicate/i.test(error.message)) { response.status(409).json({ error: 'That SKU is already in use.' }); return; }
+    if (error instanceof Error && /inventory_items|schema cache/i.test(error.message)) { response.status(503).json({ error: 'Inventory is not installed in the database yet. Run database/business-type-inventory.sql in Supabase.' }); return; }
+    next(error);
+  }
+});
+app.patch('/api/inventory/:id/stock', async (request, response, next) => {
+  const quantity = Number(request.body?.quantity);
+  if (!Number.isInteger(quantity) || quantity < 0) { response.status(400).json({ error: 'Stock must be a whole number of zero or more.' }); return; }
+  try { const cloud = (request as AuthenticatedRequest).businessContext; response.json(cloud ? await cloudUpdateInventoryStock(cloud, request.params.id, quantity) : await updateInventoryStock(request.params.id, quantity)); }
+  catch (error) { next(error); }
 });
 
 app.use('/api/expenses', businessAuth);
