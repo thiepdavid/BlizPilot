@@ -27,25 +27,30 @@ type GeoapifyFeature = { properties: {
 } };
 type LocationField = 'address' | 'city' | 'district' | 'region' | 'postalCode';
 
-function LocationAutocompleteInput({ field, value, onChange, onChoose, country, region, apiKey, placeholder, autoComplete }: {
+function LocationAutocompleteInput({ field, value, onChange, onChoose, country, apiKey, placeholder, autoComplete }: {
   field: LocationField; value: string; onChange: (value: string) => void;
-  onChoose: (feature: GeoapifyFeature) => void; country: string; region: string; apiKey: string;
+  onChoose: (feature: GeoapifyFeature) => void; country: string; apiKey: string;
   placeholder?: string; autoComplete: string;
 }) {
   const [suggestions, setSuggestions] = useState<GeoapifyFeature[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!apiKey || !country || value.trim().length < 2 || !open) {
-      setSuggestions([]); setLoading(false); return;
+      setSuggestions([]); setLoading(false); setError(''); setHasSearched(false); return;
     }
     const controller = new AbortController();
+    setSuggestions([]);
+    setError('');
+    setHasSearched(false);
+    setLoading(true);
     const timer = window.setTimeout(async () => {
-      setLoading(true); setError('');
       try {
-        const searchText = field !== 'region' && region.trim() ? `${value.trim()}, ${region.trim()}` : value.trim();
-        const params = new URLSearchParams({ text: searchText, filter: `countrycode:${country.toLowerCase()}`, format: 'geojson', limit: '5', apiKey });
+        // Keep the typed phrase intact. Adding the current region to every query
+        // made partial town/district searches overly strict and hid valid matches.
+        const params = new URLSearchParams({ text: value.trim(), filter: `countrycode:${country.toLowerCase()}`, format: 'geojson', limit: '7', apiKey });
         const type = field === 'city' ? 'city' : field === 'district' ? 'locality' : field === 'region' ? 'state' : field === 'postalCode' ? 'postcode' : '';
         if (type) params.set('type', type);
         const response = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?${params}`, { signal: controller.signal });
@@ -57,23 +62,25 @@ function LocationAutocompleteInput({ field, value, onChange, onChoose, country, 
         }
         const result = await response.json() as { features?: GeoapifyFeature[] };
         setSuggestions(result.features ?? []);
+        setHasSearched(true);
       } catch (reason) {
         if (!controller.signal.aborted) {
           setSuggestions([]);
+          setHasSearched(true);
           setError(reason instanceof TypeError ? 'Could not reach Geoapify. Check allowed origins and CORS.' : reason instanceof Error ? reason.message : 'Address search failed.');
         }
       } finally { if (!controller.signal.aborted) setLoading(false); }
-    }, 300);
+    }, 400);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [apiKey, country, field, open, region, value]);
+  }, [apiKey, country, field, open, value]);
 
   const id = `location-${field}`;
   return <div className="location-autocomplete">
     <input id={id} name={field === 'address' ? 'addressLine1' : field === 'postalCode' ? 'postalCode' : field} maxLength={field === 'postalCode' ? 30 : 200} value={value} onChange={event => { onChange(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} placeholder={placeholder} autoComplete={autoComplete} aria-autocomplete="list" aria-expanded={open && suggestions.length > 0} aria-controls={`${id}-suggestions`}/>
-    {open && (loading || error || suggestions.length > 0 || (apiKey && value.trim().length >= 2)) && <div className="location-autocomplete-status">
-      {loading && <small>Searching…</small>}
-      {error && <small className="address-search-error" role="alert">{error}</small>}
-      {!loading && !error && suggestions.length === 0 && apiKey && value.trim().length >= 2 && <small>No matching suggestions. You can keep typing.</small>}
+    {open && apiKey && country && value.trim().length >= 2 && (loading || error || hasSearched) && <div className="location-autocomplete-status">
+      {loading && <div className="address-search-note" role="status">Looking for matching places…</div>}
+      {error && <div className="address-search-error" role="alert">{error}</div>}
+      {!loading && !error && hasSearched && suggestions.length === 0 && <div className="address-search-note">No matches found. Try a shorter name or keep typing.</div>}
       {suggestions.length > 0 && <div className="address-suggestions" id={`${id}-suggestions`} role="listbox">{suggestions.map((feature, index) => <button type="button" role="option" key={feature.properties.place_id ?? `${feature.properties.formatted}-${index}`} onMouseDown={event => event.preventDefault()} onClick={() => { onChoose(feature); setSuggestions([]); setOpen(false); }}><strong>{feature.properties.name || feature.properties.address_line1 || feature.properties.formatted}</strong>{feature.properties.formatted && <span>{feature.properties.formatted}</span>}</button>)}</div>}
     </div>}
   </div>;
@@ -147,12 +154,12 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
         <p className="settings-help">Currency applies to business records. It does not convert existing amounts, and is locked after you add prices or financial records.</p>
         <div className="settings-location-fields">
           <label>Country or region<select name="country" value={countryDraft} onChange={event => { setCountryDraft(event.target.value); setAddressLine1(''); setCity(''); setDistrict(''); setRegion(''); setPostalCode(''); }}><option value="">Select a country or region</option>{countryOptions.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
-          <label>Business address<LocationAutocompleteInput field="address" country={countryDraft} region={region} apiKey={geoapifyKey} value={addressLine1} onChange={setAddressLine1} onChoose={feature => chooseLocation('address', feature)} placeholder={countryDraft ? 'Type a street, building, or business' : 'Select a country first'} autoComplete="street-address"/></label>
+          <label>Business address<LocationAutocompleteInput field="address" country={countryDraft} apiKey={geoapifyKey} value={addressLine1} onChange={setAddressLine1} onChoose={feature => chooseLocation('address', feature)} placeholder={countryDraft ? 'Type a street, building, or business' : 'Select a country first'} autoComplete="street-address"/></label>
           <div className="settings-address-row">
-            <label>City or town<LocationAutocompleteInput field="city" country={countryDraft} region={region} apiKey={geoapifyKey} value={city} onChange={setCity} onChoose={feature => chooseLocation('city', feature)} placeholder={countryDraft ? 'Start typing a city or town' : 'Select a country first'} autoComplete="address-level2"/></label>
-            <label>District / county<LocationAutocompleteInput field="district" country={countryDraft} region={region} apiKey={geoapifyKey} value={district} onChange={setDistrict} onChoose={feature => chooseLocation('district', feature)} placeholder={countryDraft ? 'Start typing a district' : 'Select a country first'} autoComplete="address-level3"/></label>
+            <label>City or town<LocationAutocompleteInput field="city" country={countryDraft} apiKey={geoapifyKey} value={city} onChange={setCity} onChoose={feature => chooseLocation('city', feature)} placeholder={countryDraft ? 'Start typing a city or town' : 'Select a country first'} autoComplete="address-level2"/></label>
+            <label>District / county<LocationAutocompleteInput field="district" country={countryDraft} apiKey={geoapifyKey} value={district} onChange={setDistrict} onChoose={feature => chooseLocation('district', feature)} placeholder={countryDraft ? 'Start typing a district' : 'Select a country first'} autoComplete="address-level3"/></label>
           </div>
-          <div className="settings-address-row"><label>{fields.regionLabel}<LocationAutocompleteInput field="region" country={countryDraft} region={region} apiKey={geoapifyKey} value={region} onChange={setRegion} onChoose={feature => chooseLocation('region', feature)} placeholder={countryDraft ? 'Start typing a region' : 'Select a country first'} autoComplete="address-level1"/></label><label>{fields.postalLabel}<LocationAutocompleteInput field="postalCode" country={countryDraft} region={region} apiKey={geoapifyKey} value={postalCode} onChange={setPostalCode} onChoose={feature => chooseLocation('postalCode', feature)} placeholder={countryDraft ? 'Start typing a code' : 'Select a country first'} autoComplete="postal-code"/></label></div>
+          <div className="settings-address-row"><label>{fields.regionLabel}<LocationAutocompleteInput field="region" country={countryDraft} apiKey={geoapifyKey} value={region} onChange={setRegion} onChoose={feature => chooseLocation('region', feature)} placeholder={countryDraft ? 'Start typing a region' : 'Select a country first'} autoComplete="address-level1"/></label><label>{fields.postalLabel}<LocationAutocompleteInput field="postalCode" country={countryDraft} apiKey={geoapifyKey} value={postalCode} onChange={setPostalCode} onChoose={feature => chooseLocation('postalCode', feature)} placeholder={countryDraft ? 'Start typing a code' : 'Select a country first'} autoComplete="postal-code"/></label></div>
           <label>{fields.taxLabel} <span>(optional)</span><input name="taxId" maxLength={100} defaultValue={location.taxId} placeholder={fields.taxLabel}/><small>{fields.taxHint}</small></label>
         </div>
         <p className="settings-help">Field names adapt to the selected country. Whether an address detail or tax number is legally required depends on your business and registration; BizPilot doesn’t determine or validate local tax obligations.</p>
