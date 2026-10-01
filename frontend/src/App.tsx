@@ -44,7 +44,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(!supabase);
   const [backendDataMode, setBackendDataMode] = useState<'local' | 'supabase' | null>(null);
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(() => getBusinessCurrencyCode());
-  const [businessLocation, setBusinessLocation] = useState<BusinessLocation>(() => ({ country: profileOverrides?.country ?? '', addressLine1: profileOverrides?.addressLine1 ?? '', city: profileOverrides?.city ?? '', region: profileOverrides?.region ?? '', postalCode: profileOverrides?.postalCode ?? '', taxId: profileOverrides?.taxId ?? '' }));
+  const [businessLocation, setBusinessLocation] = useState<BusinessLocation>(() => ({ country: profileOverrides?.country ?? '', addressLine1: profileOverrides?.addressLine1 ?? '', city: profileOverrides?.city ?? '', district: profileOverrides?.district ?? '', region: profileOverrides?.region ?? '', postalCode: profileOverrides?.postalCode ?? '', taxId: profileOverrides?.taxId ?? '' }));
   const [customers, setCustomers] = useState(sampleCustomers);
   const [appointments, setAppointments] = useState(sampleAppointments);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -75,7 +75,7 @@ export default function App() {
     if (!supabase || !session || backendDataMode !== 'supabase') return;
     let current = true;
     fetch(`${apiBase}/api/business-profile`, { headers: authHeaders }).then(response => response.ok ? response.json() : Promise.reject()).then((profile: { currencyCode?: string } & BusinessLocation) => {
-      if (current) setBusinessLocation({ country: profile.country ?? '', addressLine1: profile.addressLine1 ?? '', city: profile.city ?? '', region: profile.region ?? '', postalCode: profile.postalCode ?? '', taxId: profile.taxId ?? '' });
+      if (current) setBusinessLocation({ country: profile.country ?? '', addressLine1: profile.addressLine1 ?? '', city: profile.city ?? '', district: profile.district ?? '', region: profile.region ?? '', postalCode: profile.postalCode ?? '', taxId: profile.taxId ?? '' });
       if (current && profile.currencyCode && (supportedCurrencies as readonly string[]).includes(profile.currencyCode)) { const code = profile.currencyCode as CurrencyCode; storeCurrencyCode(code); setCurrencyCode(code); }
     }).catch(() => undefined);
     return () => { current = false; };
@@ -135,7 +135,7 @@ export default function App() {
       window.localStorage.setItem('bizpilot-profile', JSON.stringify(input));
     }
     storeCurrencyCode(input.currencyCode); setCurrencyCode(input.currencyCode);
-    setBusinessLocation({ country: input.country, addressLine1: input.addressLine1, city: input.city, region: input.region, postalCode: input.postalCode, taxId: input.taxId });
+    setBusinessLocation({ country: input.country, addressLine1: input.addressLine1, city: input.city, district: input.district, region: input.region, postalCode: input.postalCode, taxId: input.taxId });
     setProfileOverrides(input);
   }
 

@@ -19,7 +19,7 @@ export function InvoicePage({ customers, invoices, services, onCreate, prefillCu
   const [taxRate, setTaxRate] = useState(0);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
-  const businessAddress = [businessLocation.addressLine1, [businessLocation.city, businessLocation.region, businessLocation.postalCode].filter(Boolean).join(', '), countryName(businessLocation.country)].filter(Boolean).join(' · ');
+  const businessAddress = [businessLocation.addressLine1, [businessLocation.city, businessLocation.district, businessLocation.region, businessLocation.postalCode].filter(Boolean).join(', '), countryName(businessLocation.country)].filter(Boolean).join(' · ');
   useEffect(() => { if (prefillCustomerId) { setSelectedCustomerId(prefillCustomerId); setFormOpen(true); onPrefillHandled(); } }, [prefillCustomerId, onPrefillHandled]);
   const todayIso = (() => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; })();
   const isOverdue = (invoice: Invoice) => invoice.status !== 'Paid' && invoice.dueDate < todayIso;
