@@ -12,6 +12,7 @@ import { AuthenticatedRequest } from './supabase.js';
 import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
 import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices } from './cloudStore.js';
+import { getExchangeRate } from './exchangeRates.js';
 
 export const app = express();
 app.set('trust proxy', 1);
@@ -21,6 +22,25 @@ app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', service: 'bizpilot-api', dataMode: supabaseConfigured ? 'supabase' : 'local', timestamp: new Date().toISOString() });
+});
+
+const exchangeRateRequests = new Map<string, { count: number; resetAt: number }>();
+app.get('/api/exchange-rate', async (request, response) => {
+  const base = request.query.base;
+  const quote = request.query.quote;
+  if (typeof base !== 'string' || typeof quote !== 'string') { response.status(400).json({ error: 'Choose a source and display currency.' }); return; }
+  const now = Date.now();
+  const key = request.ip ?? 'unknown';
+  const bucket = exchangeRateRequests.get(key);
+  if (!bucket || bucket.resetAt <= now) exchangeRateRequests.set(key, { count: 1, resetAt: now + 60_000 });
+  else if (bucket.count >= 30) { response.status(429).json({ error: 'Currency display is temporarily rate limited. Try again in a minute.' }); return; }
+  else bucket.count++;
+  if (exchangeRateRequests.size > 5_000) for (const [ip, entry] of exchangeRateRequests) if (entry.resetAt <= now) exchangeRateRequests.delete(ip);
+  try { response.json(await getExchangeRate(base, quote)); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not load an exchange rate.';
+    response.status(message.startsWith('Choose valid') ? 400 : 502).json({ error: message });
+  }
 });
 
 const aiRequestTimes = new Map<string, number[]>();
