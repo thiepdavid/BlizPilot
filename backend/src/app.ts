@@ -267,18 +267,19 @@ app.get('/api/business-profile', async (request, response, next) => {
   } catch (error) { next(error); }
 });
 app.patch('/api/business-profile', async (request, response, next) => {
-  const { businessName, fullName, currencyCode } = request.body as { businessName?: unknown; fullName?: unknown; currencyCode?: unknown };
+  const { businessName, fullName, currencyCode, country = '', addressLine1 = '', city = '', region = '', postalCode = '', taxId = '' } = request.body as { businessName?: unknown; fullName?: unknown; currencyCode?: unknown; country?: unknown; addressLine1?: unknown; city?: unknown; region?: unknown; postalCode?: unknown; taxId?: unknown };
   let validCurrency = false;
   if (typeof currencyCode === 'string' && /^[A-Z]{3}$/.test(currencyCode)) {
     try { new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode }).format(0); validCurrency = true; } catch { /* Invalid ISO 4217 code. */ }
   }
-  if (typeof businessName !== 'string' || businessName.trim().length < 2 || typeof fullName !== 'string' || fullName.trim().length < 2 || !validCurrency) {
+  const optionalFields = [country, addressLine1, city, region, postalCode, taxId];
+  if (typeof businessName !== 'string' || businessName.trim().length < 2 || typeof fullName !== 'string' || fullName.trim().length < 2 || !validCurrency || optionalFields.some(value => typeof value !== 'string' || value.length > 300)) {
     response.status(400).json({ error: 'Enter a business name, owner name, and valid three-letter currency code.' }); return;
   }
   try {
     const context = (request as AuthenticatedRequest).businessContext;
     if (!context) { response.status(400).json({ error: 'Business profile updates require a signed-in cloud account.' }); return; }
-    response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim(), currencyCode: currencyCode as string }));
+    response.json(await cloudUpdateBusinessProfile(context, { businessName: businessName.trim(), fullName: fullName.trim(), currencyCode: currencyCode as string, country: (country as string).trim(), addressLine1: (addressLine1 as string).trim(), city: (city as string).trim(), region: (region as string).trim(), postalCode: (postalCode as string).trim(), taxId: (taxId as string).trim() }));
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message.startsWith('Business currency is locked')) {
@@ -286,6 +287,9 @@ app.patch('/api/business-profile', async (request, response, next) => {
     }
     if (/column .*currency_code.* does not exist|currency_code.*schema cache/i.test(message)) {
       response.status(503).json({ error: 'Currency settings are not installed in the database yet. Run database/business-currency.sql in Supabase, then redeploy the API.' }); return;
+    }
+    if (/column .*?(?:country|address_line1|city|region|postal_code|tax_id).* does not exist|(?:country|address_line1|city|region|postal_code|tax_id).*schema cache/i.test(message)) {
+      response.status(503).json({ error: 'Business location fields are not installed yet. Run database/business-location.sql in Supabase, then redeploy the API.' }); return;
     }
     next(error);
   }

@@ -109,12 +109,12 @@ export async function cloudUpdateCustomer(context: BusinessContext, customerId: 
 }
 
 export async function cloudGetBusinessProfile(context: BusinessContext) {
-  const business = check(await context.client.from('businesses').select('name,currency_code').eq('id', context.businessId).single()) as Row;
+  const business = check(await context.client.from('businesses').select('name,currency_code,country,address_line1,city,region,postal_code,tax_id').eq('id', context.businessId).single()) as Row;
   const profile = check(await context.client.from('users').select('full_name').eq('id', context.userId).single()) as Row;
-  return { businessName: business.name, fullName: profile.full_name ?? '', currencyCode: business.currency_code ?? 'INR' };
+  return { businessName: business.name, fullName: profile.full_name ?? '', currencyCode: business.currency_code ?? 'INR', country: business.country ?? '', addressLine1: business.address_line1 ?? '', city: business.city ?? '', region: business.region ?? '', postalCode: business.postal_code ?? '', taxId: business.tax_id ?? '' };
 }
 
-export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string; currencyCode: string }) {
+export async function cloudUpdateBusinessProfile(context: BusinessContext, input: { businessName: string; fullName: string; currencyCode: string; country: string; addressLine1: string; city: string; region: string; postalCode: string; taxId: string }) {
   const current = check(await context.client.from('businesses').select('currency_code').eq('id', context.businessId).single()) as Row;
   if ((current.currency_code ?? 'INR') !== input.currencyCode) {
     const checks = await Promise.all([
@@ -127,9 +127,9 @@ export async function cloudUpdateBusinessProfile(context: BusinessContext, input
     if (failed?.error) throw new Error(failed.error.message);
     if (checks.some(result => (result.count ?? 0) > 0)) throw new Error('Business currency is locked after prices or financial records have been added. Existing amounts are not converted.');
   }
-  const business = check(await context.client.from('businesses').update({ name: input.businessName, currency_code: input.currencyCode, updated_at: new Date().toISOString() }).eq('id', context.businessId).select('id,name,currency_code').single()) as Row;
+  const business = check(await context.client.from('businesses').update({ name: input.businessName, currency_code: input.currencyCode, country: input.country || null, address_line1: input.addressLine1 || null, city: input.city || null, region: input.region || null, postal_code: input.postalCode || null, tax_id: input.taxId || null, updated_at: new Date().toISOString() }).eq('id', context.businessId).select('id,name,currency_code,country,address_line1,city,region,postal_code,tax_id').single()) as Row;
   const profile = check(await context.client.from('users').update({ full_name: input.fullName, updated_at: new Date().toISOString() }).eq('id', context.userId).select('id,full_name').single()) as Row;
-  return { businessName: business.name, fullName: profile.full_name, currencyCode: business.currency_code };
+  return { businessName: business.name, fullName: profile.full_name, currencyCode: business.currency_code, country: business.country ?? '', addressLine1: business.address_line1 ?? '', city: business.city ?? '', region: business.region ?? '', postalCode: business.postal_code ?? '', taxId: business.tax_id ?? '' };
 }
 
 export async function cloudListCampaigns(context: BusinessContext) {
