@@ -21,7 +21,7 @@ type BusinessProfileInput = BusinessLocation & {
 };
 
 type GeoapifyFeature = { properties: {
-  place_id?: string; name?: string; formatted?: string; address_line1?: string; housenumber?: string; street?: string;
+  place_id?: string; name?: string; formatted?: string; address_line1?: string; housenumber?: string; street?: string; country_code?: string;
   city?: string; town?: string; village?: string; municipality?: string; district?: string; suburb?: string;
   neighbourhood?: string; county?: string; state?: string; province?: string; region?: string; postcode?: string;
 } };
@@ -61,7 +61,8 @@ function LocationAutocompleteInput({ field, value, onChange, onChoose, country, 
           throw new Error(`Geoapify request failed (HTTP ${response.status})${detail ? `: ${detail}` : '.'}${hint}`);
         }
         const result = await response.json() as { features?: GeoapifyFeature[] };
-        setSuggestions(result.features ?? []);
+        // Keep only results Geoapify identifies as belonging to the selected country.
+        setSuggestions((result.features ?? []).filter(feature => feature.properties.country_code?.toLowerCase() === country.toLowerCase()));
         setHasSearched(true);
       } catch (reason) {
         if (!controller.signal.aborted) {
@@ -114,7 +115,13 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
 
   function chooseLocation(field: LocationField, feature: GeoapifyFeature) {
     const place = feature.properties;
-    if (field === 'address') setAddressLine1([place.housenumber, place.street].filter(Boolean).join(' ') || place.address_line1 || place.name || '');
+    if (field === 'address') {
+      setAddressLine1(place.address_line1 || [place.housenumber, place.street].filter(Boolean).join(' ') || place.name || '');
+      setCity(place.city || place.town || place.village || place.municipality || '');
+      setDistrict(place.district || place.suburb || place.neighbourhood || place.county || '');
+      setRegion(place.state || place.province || place.region || '');
+      setPostalCode(place.postcode || '');
+    }
     if (field === 'city') setCity(place.city || place.town || place.village || place.municipality || place.name || '');
     if (field === 'district') setDistrict(place.district || place.suburb || place.neighbourhood || place.county || place.name || '');
     if (field === 'region') setRegion(place.state || place.province || place.region || place.name || '');
@@ -154,7 +161,7 @@ export function SettingsPage({ businessName, fullName, currencyCode, location, o
         <p className="settings-help">Currency applies to business records. It does not convert existing amounts, and is locked after you add prices or financial records.</p>
         <div className="settings-location-fields">
           <label>Country or region<select name="country" value={countryDraft} onChange={event => { setCountryDraft(event.target.value); setAddressLine1(''); setCity(''); setDistrict(''); setRegion(''); setPostalCode(''); }}><option value="">Select a country or region</option>{countryOptions.map(country => <option key={country.code} value={country.code}>{country.name}</option>)}</select></label>
-          <label>Business address<LocationAutocompleteInput field="address" country={countryDraft} apiKey={geoapifyKey} value={addressLine1} onChange={setAddressLine1} onChoose={feature => chooseLocation('address', feature)} placeholder={countryDraft ? 'Type a street, building, or business' : 'Select a country first'} autoComplete="street-address"/></label>
+          <label>Business address<LocationAutocompleteInput field="address" country={countryDraft} apiKey={geoapifyKey} value={addressLine1} onChange={setAddressLine1} onChoose={feature => chooseLocation('address', feature)} placeholder={countryDraft ? 'Type a street, building, or business' : 'Select a country first'} autoComplete="street-address"/><small>Choose a suggestion to fill the city, region, district, and postal code when available.</small></label>
           <div className="settings-address-row">
             <label>City or town<LocationAutocompleteInput field="city" country={countryDraft} apiKey={geoapifyKey} value={city} onChange={setCity} onChoose={feature => chooseLocation('city', feature)} placeholder={countryDraft ? 'Start typing a city or town' : 'Select a country first'} autoComplete="address-level2"/></label>
             <label>District / county<LocationAutocompleteInput field="district" country={countryDraft} apiKey={geoapifyKey} value={district} onChange={setDistrict} onChoose={feature => chooseLocation('district', feature)} placeholder={countryDraft ? 'Start typing a district' : 'Select a country first'} autoComplete="address-level3"/></label>
