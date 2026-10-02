@@ -2,3 +2,35 @@
 .inventory-toolbar{gap:12px}.inventory-search{flex:1;max-width:390px;min-width:190px;padding:7px 9px}.inventory-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:#344239;font-size:10px}.inventory-search input::placeholder{color:#99a39d}.inventory-toolbar>span{white-space:nowrap}
 @media(max-width:900px){.inventory-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-table{grid-template-columns:1.3fr .9fr .9fr .65fr .5fr;gap:7px}.inventory-table>:nth-child(3){display:none}}
 @media(max-width:620px){.inventory-table{grid-template-columns:1.3fr .8fr .6fr .45fr;gap:5px;padding:10px 4px}.inventory-table>:nth-child(2),.inventory-table>:nth-child(3){display:none}.inventory-edit-button{padding:6px}.inventory-edit-button span{display:none}.inventory-form-grid{grid-template-columns:1fr}.inventory-search{order:3;flex-basis:100%;max-width:none}.inventory-toolbar>span{margin-left:auto}}
+
+/* Keep the full variant and stock details visible on narrow phone screens. */
+@media(max-width:620px){
+  .inventory-summary{gap:8px}
+  .inventory-metric{min-width:0;padding:12px;gap:5px}
+  .inventory-metric>span{font-size:10px}
+  .inventory-metric>strong{font-size:clamp(17px,5vw,21px);overflow-wrap:anywhere}
+  .inventory-metric>small{font-size:9px;line-height:1.35}
+  .inventory-low-stock{align-items:flex-start;min-width:0;padding:10px;font-size:10px;line-height:1.45}
+  .inventory-low-stock>svg{flex:none;margin-top:1px}
+  .inventory-low-stock>span{min-width:0;overflow-wrap:anywhere}
+  .inventory-toolbar{align-items:center;flex-wrap:wrap}
+  .inventory-toolbar>strong{min-width:0}
+  .inventory-toolbar>span{font-size:8px}
+  .inventory-table.table-header{display:none}
+  .section-table .table-row.inventory-table{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 14px;padding:13px 0}
+  .section-table .table-row.inventory-table>.inventory-product{grid-column:1/-1}
+  .section-table .table-row.inventory-table>:nth-child(2),
+  .section-table .table-row.inventory-table>:nth-child(3),
+  .section-table .table-row.inventory-table>:nth-child(4),
+  .section-table .table-row.inventory-table>:nth-child(5){display:flex;min-width:0;flex-direction:column;align-items:flex-start;gap:4px;overflow-wrap:anywhere;font-size:10px}
+  .section-table .table-row.inventory-table>:nth-child(2)::before{content:'Size / color';font-size:8px;color:#91a0b5}
+  .section-table .table-row.inventory-table>:nth-child(3)::before{content:'SKU';font-size:8px;color:#91a0b5}
+  .section-table .table-row.inventory-table>:nth-child(4)::before{content:'Selling price / cost';font-size:8px;color:#91a0b5}
+  .section-table .table-row.inventory-table>:nth-child(5)::before{content:'Units / low-stock alert';font-size:8px;color:#91a0b5}
+  .section-table .table-row.inventory-table .inventory-prices,
+  .section-table .table-row.inventory-table .inventory-prices strong,
+  .section-table .table-row.inventory-table>:nth-child(5)>strong{min-width:0;max-width:100%;overflow-wrap:anywhere}
+  .section-table .table-row.inventory-table .inventory-edit-button{grid-column:1/-1;justify-self:stretch;justify-content:center;padding:8px}
+  .section-table .table-row.inventory-table .inventory-edit-button span{display:inline}
+}
+@media(max-width:380px){.inventory-metric{padding:10px}.inventory-metric>small{font-size:8px}.inventory-low-stock{font-size:9px}}
