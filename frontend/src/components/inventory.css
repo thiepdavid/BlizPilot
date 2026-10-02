@@ -49,4 +49,6 @@
 .inventory-import-row small{color:#91a0b5;font-size:8px}
 .inventory-import-row em{grid-column:1/-1;color:#ff9c96;font-size:8px;font-style:normal}
 .inventory-import-row.invalid{background:#3b2527}
+.stock-current-count{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 13px;padding:11px 12px;border:1px solid #26364c;border-radius:8px;background:#152237;color:#aab8cb;font-size:10px}
+.stock-current-count strong{color:#f0f4fb;font-size:13px}
 @media(max-width:620px){.inventory-import-row{padding:8px;gap:7px}}
