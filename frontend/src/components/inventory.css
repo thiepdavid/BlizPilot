@@ -4,9 +4,10 @@
 .inventory-import-input{display:none}.inventory-import-button{display:flex;align-items:center;justify-content:center;gap:6px;flex:none;padding:8px 10px;font-size:9px;white-space:nowrap}
 .inventory-filter-button{display:flex;align-items:center;justify-content:center;gap:6px;flex:none;padding:8px 10px;font-size:9px;white-space:nowrap}.inventory-filter-button svg{color:#f0bd68}.inventory-filter-button strong{display:grid;place-items:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#3a2b17;color:#f0bd68;font-size:8px}.inventory-filter-button.active{border-color:#8a6734;background:#302719;color:#f2c875}
 .inventory-category-filter{width:150px;min-width:120px;flex:none;padding:8px 10px;border:1px solid #2a3a53;border-radius:7px;background:#0c1626;color:#d7e1f0;font:inherit;font-size:9px}
+.inventory-detail-filter{width:120px;min-width:105px;flex:none;padding:8px 10px;border:1px solid #2a3a53;border-radius:7px;background:#0c1626;color:#d7e1f0;font:inherit;font-size:9px}
 .inventory-prices .inventory-unit-profit{color:#61d4a7;font-weight:600}.inventory-prices .inventory-unit-profit.loss{color:#ff9c96}
 @media(max-width:900px){.inventory-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-table{grid-template-columns:1.3fr .9fr .9fr .65fr .5fr;gap:7px}.inventory-table>:nth-child(3){display:none}}
-@media(max-width:900px){.inventory-toolbar{flex-wrap:wrap}.inventory-toolbar>strong{flex-basis:100%}.inventory-search{flex:1;min-width:190px}.inventory-category-filter{width:145px}}
+@media(max-width:900px){.inventory-toolbar{flex-wrap:wrap}.inventory-toolbar>strong{flex-basis:100%}.inventory-search{flex:1;min-width:190px}.inventory-category-filter{width:145px}.inventory-detail-filter{width:130px}}
 @media(max-width:620px){.inventory-table{grid-template-columns:1.3fr .8fr .6fr .45fr;gap:5px;padding:10px 4px}.inventory-table>:nth-child(2),.inventory-table>:nth-child(3){display:none}.inventory-edit-button{padding:6px}.inventory-edit-button span{display:none}.inventory-form-grid{grid-template-columns:1fr}.inventory-search{order:3;flex-basis:100%;max-width:none}.inventory-toolbar>span{margin-left:auto}}
 
 /* Keep the full variant and stock details visible on narrow phone screens. */
@@ -28,6 +29,8 @@
   .inventory-toolbar>span{order:4}
   .inventory-search{order:5;flex-basis:100%;max-width:none}
   .inventory-category-filter{order:6;width:100%;min-width:0}
+  .inventory-size-filter{order:7;width:100%;min-width:0}
+  .inventory-color-filter{order:8;width:100%;min-width:0}
   .inventory-table.table-header{display:none}
   .section-table .table-row.inventory-table{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px 14px;padding:13px 0}
   .section-table .table-row.inventory-table>.inventory-product{grid-column:1/-1}
