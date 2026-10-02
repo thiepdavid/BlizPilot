@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { Activity, CalendarDays, ChartNoAxesCombined, ChevronDown, CreditCard, LayoutDashboard, LogOut, Megaphone, Menu, MessageSquareText, ReceiptText, Scissors, Settings, Shirt, Sparkles, Users, X, Building2, UserRound } from 'lucide-react';
+import { Activity, CalendarDays, ChartNoAxesCombined, ChevronDown, CreditCard, LayoutDashboard, Megaphone, Menu, MessageSquareText, ReceiptText, Scissors, Settings, Shirt, Sparkles, Users, X, Building2 } from 'lucide-react';
 import type { BusinessType, NavKey } from '../types';
 import { ActionMenu } from './ActionMenu';
 
 const workspaceItems: { label: NavKey; icon: typeof LayoutDashboard }[] = [
-  { label: 'Home', icon: LayoutDashboard }, { label: 'Customers', icon: Users }, { label: 'Services', icon: Scissors }, { label: 'Inventory', icon: Shirt }, { label: 'Appointments', icon: CalendarDays }, { label: 'Marketing', icon: Megaphone },
+  { label: 'Home', icon: LayoutDashboard }, { label: 'Customers', icon: Users }, { label: 'Services', icon: Scissors }, { label: 'Inventory', icon: Shirt }, { label: 'Appointments', icon: CalendarDays },
 ];
 const financeItems: { label: NavKey; icon: typeof LayoutDashboard }[] = [
-  { label: 'Billing', icon: CreditCard }, { label: 'Payments', icon: Activity }, { label: 'Expenses', icon: ReceiptText }, { label: 'Reports', icon: ChartNoAxesCombined },
+  { label: 'Billing', icon: CreditCard }, { label: 'Payments', icon: Activity }, { label: 'Expenses', icon: ReceiptText }, { label: 'Reports', icon: ChartNoAxesCombined }, { label: 'Marketing', icon: Megaphone },
 ];
 
-export function Sidebar({ active, onNavigate, businessName, accountName, accountEmail, businessInitial, accountInitial, businessType, onSignOut }: { active: NavKey; onNavigate: (key: NavKey) => void; businessName: string; accountName: string; accountEmail?: string; businessInitial: string; accountInitial: string; businessType: BusinessType; onSignOut?: () => void }) {
+export function Sidebar({ active, onNavigate, businessName, businessInitial, businessType }: { active: NavKey; onNavigate: (key: NavKey) => void; businessName: string; businessInitial: string; businessType: BusinessType }) {
   const [open, setOpen] = useState(false);
   const navigate = (section: NavKey) => { onNavigate(section); setOpen(false); };
   const visibleWorkspace = businessType === 'boutique' ? workspaceItems.filter(item => item.label !== 'Services' && item.label !== 'Appointments') : workspaceItems;
@@ -22,7 +22,6 @@ export function Sidebar({ active, onNavigate, businessName, accountName, account
     <div className="nav-group"><div className="nav-caption">FINANCE</div>{renderItems(financeItems)}</div>
     <div className="nav-group nav-group-tools"><div className="nav-caption">TOOLS</div><nav><button className={`nav-item ${active === 'AI' ? 'active' : ''}`} aria-current={active === 'AI' ? 'page' : undefined} onClick={() => navigate('AI')}><Sparkles size={17}/><span>AI Assistant</span><span className="new-tag">NEW</span></button><button className={`nav-item ${active === 'Settings' ? 'active' : ''}`} aria-current={active === 'Settings' ? 'page' : undefined} onClick={() => navigate('Settings')}><Settings size={17}/><span>Settings</span></button></nav></div>
     <div className="sidebar-spacer"/><div className="help-card"><div className="help-icon"><MessageSquareText size={17}/></div><strong>Need a hand?</strong><p>We're here to help you grow.</p><button onClick={() => navigate('Settings')}>Visit help centre <span>↗</span></button></div>
-    <ActionMenu label="Open profile menu" heading={accountName} description={accountEmail || 'Business owner'} triggerClassName="profile-row" placement="top" items={[{ label: 'Profile & business settings', description: 'Update your workspace details', icon: <UserRound size={16}/>, onSelect: () => navigate('Settings') }, ...(onSignOut ? [{ label: 'Sign out', description: 'Sign out of this account', icon: <LogOut size={16}/>, onSelect: onSignOut, destructive: true }] : [])]} trigger={<><div className="profile-avatar">{accountInitial}</div><span><strong>{accountName}</strong><small>Business owner</small></span><ChevronDown size={16}/></>}/>
   </>;
   return <><button aria-label="Open navigation" className="mobile-menu" onClick={() => setOpen(true)}><Menu size={21}/></button>{open && <button aria-label="Close navigation backdrop" className="sidebar-backdrop" onClick={() => setOpen(false)}/>}<aside className={`sidebar ${open ? 'sidebar-open' : ''}`}><button aria-label="Close navigation" className="mobile-close" onClick={() => setOpen(false)}><X size={19}/></button>{nav}</aside></>;
 }
