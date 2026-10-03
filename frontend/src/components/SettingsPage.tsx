@@ -89,14 +89,19 @@ function LocationAutocompleteInput({ field, value, onChange, onChoose, country, 
   </div>;
 }
 
-export function SettingsPage({ businessName, fullName, currencyCode, businessType, location, onSave }: {
+export function SettingsPage({ businessName, fullName, currencyCode, businessType, location, onSave, onDeleteAccount }: {
   businessName: string;
   fullName: string;
   currencyCode: CurrencyCode;
   businessType: BusinessType;
   location: BusinessLocation;
   onSave: (input: BusinessProfileInput) => Promise<void>;
+  onDeleteAccount?: () => Promise<void>;
 }) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -182,5 +187,14 @@ export function SettingsPage({ businessName, fullName, currencyCode, businessTyp
         <div className="modal-actions"><button className="primary-button" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save profile'}</button></div>
       </form>
     </section>
+    {onDeleteAccount && <section className="panel settings-delete-panel" aria-labelledby="delete-account-heading">
+      <div><h2 id="delete-account-heading">Delete account</h2><p>Permanently remove your sign-in and business data. Workspaces shared with others are kept, but ownership must be transferred before deleting an owner account.</p></div>
+      {!deleteOpen ? <button type="button" className="settings-delete-button" onClick={() => { setDeleteError(''); setDeleteConfirmation(''); setDeleteOpen(true); }}>Delete my account</button> : <div className="settings-delete-confirm">
+        <label htmlFor="delete-account-confirmation">Type <strong>DELETE</strong> to confirm<input id="delete-account-confirmation" autoComplete="off" value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} aria-describedby="delete-account-warning"/></label>
+        <p id="delete-account-warning">This cannot be undone. You will be signed out, and your sole-member business workspace and its records will be removed.</p>
+        {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
+        <div className="settings-delete-actions"><button type="button" className="secondary-button" disabled={deleting} onClick={() => { setDeleteOpen(false); setDeleteConfirmation(''); setDeleteError(''); }}>Cancel</button><button type="button" className="settings-delete-button" disabled={deleting || deleteConfirmation !== 'DELETE'} onClick={async () => { setDeleting(true); setDeleteError(''); try { await onDeleteAccount(); } catch (reason) { setDeleteError(reason instanceof Error ? reason.message : 'Could not delete your account.'); setDeleting(false); } }}>{deleting ? 'Deleting…' : 'Permanently delete account'}</button></div>
+      </div>}
+    </section>}
   </>;
 }

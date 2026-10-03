@@ -1,4 +1,4 @@
-export type NavKey = 'Home' | 'Customers' | 'Services' | 'Inventory' | 'Appointments' | 'Billing' | 'Payments' | 'Expenses' | 'Reports' | 'Marketing' | 'AI' | 'Plans' | 'Settings' | 'Help Centre';
+export type NavKey = 'Home' | 'Customers' | 'Services' | 'Inventory' | 'Appointments' | 'Billing' | 'Payments' | 'Expenses' | 'Reports' | 'Marketing' | 'AI' | 'Settings' | 'Help Centre';
 export type BusinessType = 'boutique' | 'restaurant' | 'salon' | 'grocery' | 'electronics' | 'pharmacy' | 'other';
 export interface InventoryItem { id: string; name: string; category: string; sku: string; size: string; color: string; costPrice: number; sellingPrice: number; quantity: number; lowStockAt: number; createdAt: string }
 export interface Customer { id: string; name: string; initials: string; email: string; phone?: string; notes?: string; visits: number; lastVisit: string; tone: string }

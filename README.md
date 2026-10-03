@@ -1,6 +1,6 @@
 # BizPilot
 
-BizPilot is a working SaaS starter for small service businesses. It includes a responsive React dashboard, an Express API, Supabase/PostgreSQL integration with row-level security, and local demo storage. The Daily Brief uses simple rules on saved business records. Ask BizPilot can answer follow-up questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or collected through Razorpay Payment Links. The Razorpay connection starts in test mode; WhatsApp and other message delivery are not connected.
+BizPilot is a boutique-first business manager with a responsive React dashboard, an Express API, Supabase/PostgreSQL integration, and local demo storage. It supports products and variants, inventory, invoices, payments, expenses, customer records, and reports. The Daily Brief uses rules on saved business records. Ask BizPilot can answer questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or collected through Razorpay Payment Links. WhatsApp delivery is not connected.
 
 ## Project structure
 
@@ -93,6 +93,10 @@ The repository includes `vercel.json` for the Vite frontend and `render.yaml` fo
 5. In Supabase Authentication URL Configuration, set the production Site URL and allowed redirect URL to your Vercel domain.
 
 The Render Blueprint initially allows the local development origin. Update `CORS_ORIGIN` after the frontend has a deployment URL. Set cloud storage in both apps before using production data; local JSON storage is not suitable for hosted persistence. Vite environment values are embedded into the frontend at build time, so redeploy Vercel after changing them. Keep service-role credentials out of Vercel and store them only as private Render environment variables.
+
+## Account deletion
+
+The signed-in app provides **Settings → Delete account**. Run `database/account-deletion.sql` in the Supabase SQL Editor, and confirm `SUPABASE_SERVICE_ROLE_KEY` is set as a private Render environment variable (never in Vercel or a frontend `.env`). The API checks the signed-in user's token, removes their membership and profile, deletes a business and its cascading records only when it is safe to do so, then deletes the Supabase Auth account. Shared workspaces owned by the deleting user require ownership transfer first. If database cleanup fails, the API refuses to delete the login account. Redeploy the API and frontend after setting this up.
 
 ## Razorpay payment links (test mode first)
 

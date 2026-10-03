@@ -1,5 +1,6 @@
 import cors from 'cors';
 import express from 'express';
+import { createClient } from '@supabase/supabase-js';
 import { createCustomer, listCustomers, updateCustomer } from './customers.js';
 import { createAppointment, listAppointments, updateAppointmentStatus, updateAppointmentSchedule, type AppointmentRecord } from './appointments.js';
 import { createInvoice, listInvoices } from './invoices.js';
@@ -23,6 +24,48 @@ app.use(express.json());
 
 app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', service: 'bizpilot-api', dataMode: supabaseConfigured ? 'supabase' : 'local', timestamp: new Date().toISOString() });
+});
+
+app.post('/api/account/delete', async (request, response) => {
+  if (request.body?.confirmation !== 'DELETE') {
+    response.status(400).json({ error: 'Type DELETE to confirm account removal.' }); return;
+  }
+  const authorization = request.header('authorization');
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!authorization?.startsWith('Bearer ') || !supabaseUrl || !anonKey) {
+    response.status(401).json({ error: 'Sign in again before deleting your account.' }); return;
+  }
+  if (!serviceKey) {
+    response.status(503).json({ error: 'Account deletion is not configured yet. Contact BizPilot support.' }); return;
+  }
+
+  try {
+    const accessToken = authorization.slice('Bearer '.length);
+    const userClient = createClient(supabaseUrl, anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    const { data: { user }, error: authError } = await userClient.auth.getUser(accessToken);
+    if (authError || !user) { response.status(401).json({ error: 'Your session has expired. Sign in again, then retry.' }); return; }
+
+    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    const { error: cleanupError } = await admin.rpc('delete_bizpilot_user_data', { p_user_id: user.id });
+    if (cleanupError) {
+      console.error('Account data deletion failed:', cleanupError.message);
+      if (cleanupError.message.includes('Transfer ownership of shared businesses')) {
+        response.status(409).json({ error: 'Transfer ownership of any shared business first, then try deleting your account again.' }); return;
+      }
+      response.status(503).json({ error: 'Account deletion is not ready in the database. Your account is still active; contact BizPilot support.' }); return;
+    }
+    const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+    if (deleteError) {
+      console.error('Supabase Auth account deletion failed:', deleteError.message);
+      response.status(502).json({ error: 'Your business data was removed, but the login account could not be deleted. Contact BizPilot support.' }); return;
+    }
+    response.json({ deleted: true });
+  } catch (error) {
+    console.error('Account deletion request failed:', error);
+    response.status(500).json({ error: 'Could not complete account deletion. Contact BizPilot support.' });
+  }
 });
 
 const exchangeRateRequests = new Map<string, { count: number; resetAt: number }>();
