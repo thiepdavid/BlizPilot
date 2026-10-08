@@ -10,7 +10,8 @@ import { createExpense, listExpenses } from './expenses.js';
 import { createCampaign, listCampaigns, updateCampaign, deleteCampaign } from './campaigns.js';
 import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
-import { createRazorpayPaymentLink, handleRazorpayWebhook } from './razorpay.js';
+import { handleRazorpayWebhook } from './razorpay.js';
+import { createStripePaymentLink, getStripeAccountStatus, handleStripeConnectWebhook, startStripeOnboarding } from './stripeConnect.js';
 import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
 import { getExchangeRate } from './exchangeRates.js';
@@ -48,6 +49,7 @@ app.use('/api', (request, response, next) => {
   next();
 });
 app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeConnectWebhook);
 app.use(express.json({ limit: '64kb', strict: true }));
 
 app.get('/api/health', (_request, response) => {
@@ -629,6 +631,28 @@ app.get('/api/payments', async (request, response, next) => {
   catch (error) { next(error); }
 });
 
+app.get('/api/payments/stripe/account', async (request, response, next) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Connect a Supabase business account to manage online payments.' }); return; }
+    response.json(await getStripeAccountStatus(context));
+  } catch (error) { next(error); }
+});
+
+app.post('/api/payments/stripe/connect', async (request, response) => {
+  const country = request.body?.country;
+  if (typeof country !== 'string' || !/^[A-Z]{2}$/.test(country)) { response.status(400).json({ error: 'Choose your business country in Settings before connecting payments.' }); return; }
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'Connect a Supabase business account to manage online payments.' }); return; }
+    response.json(await startStripeOnboarding(context, country));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Stripe could not start account onboarding.';
+    const setupIssue = message.includes('not configured') || message.includes('Set CLIENT_ORIGIN') || message.includes('Secure payment account storage');
+    response.status(setupIssue ? 503 : 400).json({ error: message });
+  }
+});
+
 app.post('/api/payments/link', async (request, response, next) => {
   const { invoiceId } = request.body as { invoiceId?: unknown };
   if (typeof invoiceId !== 'string' || !invoiceId) {
@@ -641,14 +665,14 @@ app.post('/api/payments/link', async (request, response, next) => {
     return;
   }
   try {
-    const paymentLink = await createRazorpayPaymentLink(cloud, invoiceId);
+    const paymentLink = await createStripePaymentLink(cloud, invoiceId);
     response.status(201).json(paymentLink);
   } catch (error) {
-    if (error instanceof Error && error.message.includes('not configured yet')) {
+    if (error instanceof Error && (error.message.includes('not configured yet') || error.message.includes('not configured.') || error.message.includes('Set CLIENT_ORIGIN'))) {
       response.status(503).json({ error: error.message });
       return;
     }
-    if (error instanceof Error && (error.message.includes('invoice') || error.message.includes('balance') || error.message.includes('Razorpay payment links'))) {
+    if (error instanceof Error && (error.message.includes('invoice') || error.message.includes('balance') || error.message.includes('Connect your business Stripe') || error.message.includes('Stripe is still reviewing') || error.message.includes('country cannot be changed') || error.message.includes('Stripe could not') || error.message.includes('currency') || error.message.includes('smaller units'))) {
       response.status(400).json({ error: error.message });
       return;
     }

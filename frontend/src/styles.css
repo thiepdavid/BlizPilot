@@ -88,5 +88,6 @@ html{min-width:320px;overflow-x:hidden}body,#root,.app-shell,.main-area,.content
 .invoice-document-actions{position:sticky;bottom:-34px;z-index:2;background:#fff}
 @media(max-width:620px){.modal-backdrop{padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom))}.customer-modal,.invoice-document{max-height:calc(100dvh - 20px)}.customer-modal .modal-actions{bottom:-18px}.invoice-document-actions{bottom:-17px}}
 @media(prefers-color-scheme:dark){.customer-modal .modal-actions{background:#111c2d;border-color:#26364c}}
+.app-shell .stripe-connect-panel{background:#111c2d;border-color:#26364c;color:#e7edf7}.stripe-connect-panel .stripe-connect-copy strong{color:#f0f4fb}.stripe-connect-panel .stripe-connect-copy p,.stripe-connect-panel .stripe-connect-hint{color:#91a0b5}
 @media(max-width:380px){.content-area{padding-left:10px;padding-right:10px}.metrics-grid{gap:7px}.metric-card{padding:10px}.metric-value{font-size:18px}.page-heading h1{font-size:19px}.page-heading p{max-width:190px}.page-heading>.primary-button{padding:8px;font-size:8px}.invoice-summary-card{grid-template-columns:30px minmax(0,1fr);column-gap:7px}.invoice-summary-icon{width:29px;height:29px}.topbar-actions{gap:3px}.records-export-grid{grid-template-columns:1fr}}
 @media(hover:none){button:hover{filter:none}}

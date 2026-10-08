@@ -26,5 +26,11 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_CONNECT_WEBHOOK_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        value: https://blizpilot-alpha.vercel.app
       - key: CORS_ORIGIN
         value: https://blizpilot-alpha.vercel.app

@@ -1,6 +1,6 @@
 # BizPilot
 
-BizPilot is a boutique-first business manager with a responsive React dashboard, an Express API, Supabase/PostgreSQL integration, and local demo storage. It supports products and variants, inventory, invoices, payments, expenses, customer records, and reports. The Daily Brief uses rules on saved business records. Ask BizPilot can answer questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or collected through Razorpay Payment Links. WhatsApp delivery is not connected.
+BizPilot is a boutique-first business manager with a responsive React dashboard, an Express API, Supabase/PostgreSQL integration, and local demo storage. It supports products and variants, inventory, invoices, payments, expenses, customer records, and reports. The Daily Brief uses rules on saved business records. Ask BizPilot can answer questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or, when enabled, collected through the business owner's connected Stripe account. WhatsApp delivery is not connected.
 
 ## Project structure
 
@@ -21,7 +21,7 @@ bizpilot/
 - Appointment booking, search, date/status filters, status updates, rescheduling, and overlap checks
 - Shareable public booking page; customer requests arrive as pending appointments for owner confirmation
 - Invoice creation with an optional configurable tax rate, invoice preview/print, outstanding balances, and overdue filters
-- Manual payment recording, invoice payment links through Razorpay, webhook-confirmed online payments, and copy-only reminders
+- Manual payment recording, Stripe Connect invoice checkout (after platform and business account setup), webhook-confirmed online payments, and copy-only reminders
 - Expense tracking and month/category reports with CSV export
 - Marketing message drafts that can be edited and copied; BizPilot does not send messages
 - Search across saved business records and dashboard notifications for overdue invoices or pending appointments
@@ -79,7 +79,7 @@ npm run build
 - Push the project to a Git provider and connect it to Vercel and Render.
 - Enter your production Supabase values and deployment URLs in the hosting dashboards.
 - Apply and verify the schema in the production Supabase project.
-- Set up Razorpay and its test credentials to try online payments; switch to live credentials only after the Razorpay account is approved and the payment flow has been tested.
+- Set up Stripe Connect with test credentials to try online payments; use live credentials only after the platform and connected businesses are approved and the full payment flow has been tested. Existing Razorpay variables support the legacy webhook only; new payment links use Stripe Connect.
 
 
 ## Deployment starter (Vercel + Render)
@@ -98,15 +98,17 @@ The Render Blueprint initially allows the local development origin. Update `CORS
 
 The signed-in app provides **Settings → Delete account**. Run `database/account-deletion.sql` in the Supabase SQL Editor, and confirm `SUPABASE_SERVICE_ROLE_KEY` is set as a private Render environment variable (never in Vercel or a frontend `.env`). The API checks the signed-in user's token, removes their membership and profile, deletes a business and its cascading records only when it is safe to do so, then deletes the Supabase Auth account. Shared workspaces owned by the deleting user require ownership transfer first. If database cleanup fails, the API refuses to delete the login account. Redeploy the API and frontend after setting this up.
 
-## Razorpay payment links (test mode first)
+## Global online payments with Stripe Connect
 
-1. In Supabase SQL Editor, run `database/razorpay-payments.sql`. This adds an idempotency table and a server-only function so verified payment webhooks update the right invoice once.
-2. In Razorpay, activate a merchant account if prompted, then create **Test Mode** API keys. Never paste secret keys into chat or the frontend.
-3. In Render → `bizpilot-api` → **Environment**, add `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `SUPABASE_SERVICE_ROLE_KEY`. The service-role key is available in your Supabase project API settings. Keep all three only on the backend.
-4. In Razorpay Dashboard → **Account & Settings → Webhooks**, add `https://bizpilot-api-t8bl.onrender.com/api/payments/razorpay/webhook`, choose the `payment_link.paid` event, and set a webhook secret. Add that same secret to Render as `RAZORPAY_WEBHOOK_SECRET`.
-5. Save Render environment changes and redeploy the API. In BizPilot, open **Payments → Create pay link** for an unpaid invoice, then share the copied Razorpay URL with your customer. After the test payment, Razorpay's signed webhook adds the payment and updates the invoice balance.
+Each business connects its own Stripe account. Checkout charges are created directly on that connected account, so payment proceeds settle to that business rather than a shared BizPilot account. Stripe verifies the business through its hosted onboarding. What the customer can use at checkout depends on the connected account's country, currency, Stripe approval, and enabled payment methods.
 
-For local development, put the same test values in `backend/.env` and configure Razorpay webhook delivery to reach your local API through a secure webhook-forwarding tool. Payment links require a signed-in Supabase account and an invoice stored in Supabase. Test mode simulates payment; it does not transfer real money. Live charges require Razorpay approval, live API keys, and successful end-to-end testing.
+1. In Supabase SQL Editor, run `database/stripe-connect-payments.sql` once. It creates a private mapping from BizPilot businesses to connected Stripe accounts and an idempotent, server-only payment recording function.
+2. BizPilot needs a Stripe Connect platform account in a country where Stripe supports it. Add the platform's **test secret key** as `STRIPE_SECRET_KEY` in Render → `bizpilot-api` → **Environment**. Also set `CLIENT_ORIGIN` to the exact deployed frontend origin, such as `https://blizpilot-alpha.vercel.app`. Keep the Stripe key and Supabase service-role key on the backend only.
+3. In Stripe Dashboard → **Webhooks**, create a Connect webhook that listens to events from connected accounts. Set the endpoint URL to `https://bizpilot-api-t8bl.onrender.com/api/payments/stripe/webhook` and select `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Save its signing secret in Render as `STRIPE_CONNECT_WEBHOOK_SECRET`.
+4. Save the Render environment changes and redeploy the API. In BizPilot, open **Payments → Connect Stripe** for each business and complete Stripe's hosted onboarding. The business country must already be selected in Settings.
+5. Create a payment link for an unpaid invoice and share it with the customer. Stripe hosts checkout in the invoice currency; after Stripe confirms payment, its signed webhook records the payment and updates the invoice.
+
+For local development, use Stripe **test mode** credentials and configure Stripe CLI/webhook forwarding to `http://localhost:4000/api/payments/stripe/webhook`. India-based Stripe accounts currently require an invitation from Stripe, and every connected business must independently meet Stripe's country-specific identity and payout requirements. A successful test does not enable live payments. Before launch, test the full onboarding, checkout, webhook, refund, and payout flows with the real platform country and supported business countries. Any payment links issued by the older shared Razorpay integration should be cancelled in Razorpay before using this connected-account flow for live payments.
 
 ## Public appointment booking
 
@@ -139,7 +141,7 @@ Add `OPENAI_API_KEY` to the backend environment (local `backend/.env` or Render 
 
 ### Business currency
 
-After `database/public-booking-closures.sql`, run `database/business-currency.sql` in the Supabase SQL Editor before deploying the business-currency update. In **Settings → Business profile**, choose your business accounting currency. BizPilot formats service prices, invoices, payments, expenses, and reports in that currency. It does not convert existing amounts; the API prevents changing the currency after prices or financial records exist. Razorpay payment links remain INR-only.
+After `database/public-booking-closures.sql`, run `database/business-currency.sql` in the Supabase SQL Editor before deploying the business-currency update. In **Settings → Business profile**, choose your business accounting currency. BizPilot formats service prices, invoices, payments, expenses, and reports in that currency. It does not convert existing amounts; the API prevents changing the currency after prices or financial records exist. Stripe Checkout uses the invoice's business currency when that currency and account are supported.
 
 Run `database/business-location.sql` in Supabase before deploying the business-location update. Businesses can save their country, district, mailing address, and tax identifier in **Settings → Business profile**. Saved address details appear on printed invoices.
 
