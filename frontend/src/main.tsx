@@ -2,7 +2,6 @@ import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles.css';
-import './design-refinements.css';
 
 const PublicBookingPage = lazy(() => import('./components/PublicBookingPage').then(module => ({ default: module.PublicBookingPage })));
 const LegalPage = lazy(() => import('./components/LegalPage').then(module => ({ default: module.LegalPage })));
