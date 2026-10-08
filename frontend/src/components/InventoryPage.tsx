@@ -1,6 +1,7 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { AlertTriangle, Box, Download, PackagePlus, Pencil, Search, Shirt, Upload, X } from 'lucide-react';
 import { formatCurrency, getBusinessCurrencyCode } from '../lib/currency';
+import { readCsvUpload, sanitizeCsvCell } from '../lib/csvUpload';
 import type { InventoryItem } from '../types';
 import './inventory.css';
 
@@ -21,7 +22,7 @@ function parseCsv(text: string): string[][] {
     else cell += char;
   }
   if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows;
+  return rows.map(parsedRow => parsedRow.map(sanitizeCsvCell));
 }
 export function InventoryPage({ items, onCreate, onStockChange }: { items: InventoryItem[]; onCreate: (input: NewItem) => Promise<void>; onStockChange: (id: string, quantity: number) => Promise<void> }) {
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<InventoryItem | null>(null);
@@ -63,7 +64,7 @@ export function InventoryPage({ items, onCreate, onStockChange }: { items: Inven
     const file = event.currentTarget.files?.[0]; event.currentTarget.value = '';
     if (!file) return;
     setImportError('');
-    void file.text().then(text => {
+    void readCsvUpload(file).then(text => {
       const rows = parseCsv(text);
       if (rows.length < 2) throw new Error('Choose a CSV with a header row and at least one product.');
       if (rows.length > 501) throw new Error('Import up to 500 product variants at a time.');

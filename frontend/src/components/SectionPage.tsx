@@ -1,4 +1,5 @@
 import { formatCurrency } from '../lib/currency';
+import { readCsvUpload, sanitizeCsvCell } from '../lib/csvUpload';
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { CalendarDays, Download, FileText, Plus, Search, Upload, X, CircleDollarSign } from 'lucide-react';
 import type { Appointment, Customer, Invoice, NavKey, Payment } from '../types';
@@ -26,7 +27,7 @@ function parseCsv(text: string): string[][] {
     else cell += char;
   }
   if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows;
+  return rows.map(parsedRow => parsedRow.map(sanitizeCsvCell));
 }
 export function SectionPage({ section, customers, appointments, invoices, payments, apiBase, authToken, onAddCustomer, onUpdateCustomer, onBookAppointment, onCreateInvoice, onRecordPayment, onNavigate }: { section: Section; customers: Customer[]; appointments: Appointment[]; invoices: Invoice[]; payments: Payment[]; apiBase: string; authToken?: string; onAddCustomer: (input: { name: string; email: string; phone: string; notes?: string }) => Promise<void>; onUpdateCustomer: (id: string, input: { name: string; email: string; phone: string; notes?: string }) => Promise<void>; onBookAppointment: (customerId: string) => void; onCreateInvoice: (customerId: string) => void; onRecordPayment: (invoiceId: string) => void; onNavigate: (section: NavKey) => void }) {
   const [customerSearch, setCustomerSearch] = useState('');
@@ -72,9 +73,10 @@ export function SectionPage({ section, customers, appointments, invoices, paymen
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file) return;
-    void file.text().then(text => {
+    void readCsvUpload(file).then(text => {
       const rows = parseCsv(text);
       if (rows.length < 2) throw new Error('Add a header row and at least one customer.');
+      if (rows.length > 501) throw new Error('Import up to 500 customers at a time.');
       const headers = rows[0].map(header => header.trim().toLowerCase().replace(/[_\s]+/g, ' '));
       const nameIndex = headers.findIndex(header => header === 'name' || header === 'full name');
       const emailIndex = headers.indexOf('email'); const phoneIndex = headers.findIndex(header => header === 'phone' || header === 'phone number'); const notesIndex = headers.indexOf('notes');
@@ -85,6 +87,7 @@ export function SectionPage({ section, customers, appointments, invoices, paymen
       for (const values of rows.slice(1).filter(row => row.some(value => value.trim()))) {
         const customer = { name: (values[nameIndex] ?? '').trim(), email: (values[emailIndex] ?? '').trim(), phone: (values[phoneIndex] ?? '').trim(), notes: (values[notesIndex] ?? '').trim() };
         if (customer.name.length < 2) { parsed.push({ ...customer, issue: 'Name is missing or too short' }); continue; }
+        if (customer.name.length > 160 || customer.email.length > 254 || customer.phone.length > 50 || (customer.notes?.length ?? 0) > 2000) { parsed.push({ ...customer, issue: 'Name, email, phone, or notes exceed the allowed length' }); continue; }
         const email = customer.email.toLowerCase(); const phone = customer.phone.replace(/\D/g, '');
         if ((email && knownEmails.has(email)) || (phone && knownPhones.has(phone))) { parsed.push({ ...customer, issue: 'Email or phone already exists' }); continue; }
         if (email) knownEmails.add(email);

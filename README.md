@@ -98,6 +98,12 @@ The Render Blueprint initially allows the local development origin. Update `CORS
 
 The signed-in app provides **Settings → Delete account**. Run `database/account-deletion.sql` in the Supabase SQL Editor, and confirm `SUPABASE_SERVICE_ROLE_KEY` is set as a private Render environment variable (never in Vercel or a frontend `.env`). The API checks the signed-in user's token, removes their membership and profile, deletes a business and its cascading records only when it is safe to do so, then deletes the Supabase Auth account. Shared workspaces owned by the deleting user require ownership transfer first. If database cleanup fails, the API refuses to delete the login account. Redeploy the API and frontend after setting this up.
 
+## Input and upload safety
+
+- Customer and inventory imports accept UTF-8 `.csv` files up to 5 MB and 500 data rows. The browser reads and parses these files locally; BizPilot does not upload or retain the original files.
+- JSON text sent to the API is Unicode-normalized and stripped of non-printing control characters, with request and field size limits. User-provided text is rendered as ordinary React text, which HTML-escapes it; do not render it with `dangerouslySetInnerHTML` or direct HTML insertion.
+- Stripe Checkout webhooks are checked against Stripe's signature and timestamp using the untouched raw request body before event data is parsed. Only paid Checkout events are passed to the payment-recording database function.
+
 ## Global online payments with Stripe Connect
 
 Each business connects its own Stripe account. Checkout charges are created directly on that connected account, so payment proceeds settle to that business rather than a shared BizPilot account. Stripe verifies the business through its hosted onboarding. What the customer can use at checkout depends on the connected account's country, currency, Stripe approval, and enabled payment methods.

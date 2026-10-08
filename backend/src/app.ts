@@ -16,6 +16,7 @@ import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBooking
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
 import { getExchangeRate } from './exchangeRates.js';
 import { createInventoryItem, listInventory, updateInventoryStock } from './inventory.js';
+import { sanitizeSubmittedValues } from './inputSafety.js';
 
 export const app = express();
 app.set('trust proxy', 1);
@@ -51,6 +52,13 @@ app.use('/api', (request, response, next) => {
 app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
 app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeConnectWebhook);
 app.use(express.json({ limit: '64kb', strict: true }));
+app.use((request, response, next) => {
+  if (request.body === undefined) return next();
+  try { request.body = sanitizeSubmittedValues(request.body); next(); }
+  catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Request text is invalid.' });
+  }
+});
 
 app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', service: 'bizpilot-api', dataMode: supabaseConfigured ? 'supabase' : 'local', timestamp: new Date().toISOString() });
