@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { BusinessContext } from './supabase.js';
 
-function anonymousClient() {
+function bookingAdminClient() {
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error('Public booking needs Supabase configured on the API.');
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) throw new Error('Secure public booking requests are not configured on the API.');
+  return createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 export async function ensurePublicBookingPage(context: BusinessContext, timezone: string) {
@@ -50,20 +50,20 @@ export async function saveBusinessBookingClosures(context: BusinessContext, date
 }
 
 export async function getPublicBookingPage(slug: string) {
-  const { data, error } = await anonymousClient().rpc('get_public_booking_page', { target_slug: slug });
+  const { data, error } = await bookingAdminClient().rpc('get_public_booking_page', { target_slug: slug });
   if (error) throw new Error(error.message);
   if (!data) return null;
   return data;
 }
 
 export async function getPublicBookingBusyTimes(slug: string, date: string) {
-  const { data, error } = await anonymousClient().rpc('get_public_booking_busy_times', { target_slug: slug, target_date: date });
+  const { data, error } = await bookingAdminClient().rpc('get_public_booking_busy_times', { target_slug: slug, target_date: date });
   if (error) throw new Error(error.message);
   return data as Array<{ startsAt: string; endsAt: string }>;
 }
 
 export async function createPublicBookingRequest(slug: string, input: { name: string; phone: string; email: string; serviceId: string; startsAt: string }) {
-  const { data, error } = await anonymousClient().rpc('request_public_booking', {
+  const { data, error } = await bookingAdminClient().rpc('request_public_booking', {
     target_slug: slug,
     customer_name: input.name,
     customer_phone: input.phone || null,

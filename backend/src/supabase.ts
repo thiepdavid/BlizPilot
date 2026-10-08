@@ -9,7 +9,10 @@ export interface BusinessContext { client: SupabaseClient; businessId: string; u
 export interface AuthenticatedRequest extends Request { businessContext?: BusinessContext }
 
 export async function businessAuth(request: Request, response: Response, next: NextFunction) {
-  if (!supabaseConfigured) return next();
+  if (!supabaseConfigured) {
+    if (process.env.NODE_ENV === 'production') return response.status(503).json({ error: 'The business API is temporarily unavailable.' });
+    return next();
+  }
   const authorization = request.header('authorization');
   if (!authorization?.startsWith('Bearer ')) return response.status(401).json({ error: 'Please sign in to continue.' });
   try {

@@ -374,6 +374,7 @@ export default function App() {
     ].slice(0, 8);
   }, [invoices, appointments, inventoryItems, businessType, today.getTime()]);
 
+  if (import.meta.env.PROD && !supabase) return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-mark">BP</div><strong>Setup required</strong></div><h1>BizPilot is temporarily unavailable</h1><p className="auth-intro">The secure account connection is not configured. Please contact the business owner or try again later.</p></section></main>;
   if (supabase && !authReady) return <main className="auth-screen"><section className="auth-card">Loading your account…</section></main>;
   if (supabase && !session) return <AuthPage client={supabase}/>;
   if ((supabase && backendDataMode !== 'supabase') || (!supabase && backendDataMode === 'supabase')) return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-mark">BP</div><strong>Supabase setup needed</strong></div><h1>Finish connecting BizPilot</h1><p className="auth-intro">The frontend and API must both be configured for the same Supabase project. Check both environment files, restart the dev server, and confirm the database schema was applied.</p><button className="auth-submit" onClick={() => void supabase?.auth.signOut()}>Sign out</button></section></main>;

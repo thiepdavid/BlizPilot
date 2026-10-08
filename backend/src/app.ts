@@ -18,9 +18,37 @@ import { createInventoryItem, listInventory, updateInventoryStock } from './inve
 
 export const app = express();
 app.set('trust proxy', 1);
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173' }));
+const allowedOrigins = new Set((process.env.CORS_ORIGIN ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173'))
+  .split(',').map(origin => origin.trim()).filter(Boolean));
+app.use((_request, response, next) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)) }));
+const apiRateLimit = new Map<string, { count: number; resetAt: number }>();
+app.use('/api', (request, response, next) => {
+  if (request.path === '/health') return next();
+  const now = Date.now();
+  const key = request.ip ?? 'unknown';
+  const bucket = apiRateLimit.get(key);
+  if (!bucket || bucket.resetAt <= now) apiRateLimit.set(key, { count: 1, resetAt: now + 60_000 });
+  else if (bucket.count >= 120) {
+    response.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    response.status(429).json({ error: 'Too many requests. Please wait a minute and try again.' });
+    return;
+  } else bucket.count++;
+  if (apiRateLimit.size > 5_000) {
+    for (const [ip, entry] of apiRateLimit) if (entry.resetAt <= now) apiRateLimit.delete(ip);
+    while (apiRateLimit.size > 5_000) apiRateLimit.delete(apiRateLimit.keys().next().value as string);
+  }
+  next();
+});
 app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
-app.use(express.json());
+app.use(express.json({ limit: '64kb', strict: true }));
 
 app.get('/api/health', (_request, response) => {
   response.json({ status: 'ok', service: 'bizpilot-api', dataMode: supabaseConfigured ? 'supabase' : 'local', timestamp: new Date().toISOString() });
