@@ -192,6 +192,6 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
         <button className="public-booking-submit" type="submit" disabled={saving || !serviceId || !requestedTime}>{saving ? 'Sending request…' : 'Request appointment'}</button>
       </form>}
     </>}
-    <footer className="public-booking-footer">Powered by BizPilot</footer>
+    <footer className="public-booking-footer"><span>Powered by BizPilot</span><nav aria-label="Legal pages"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
   </section></main>;
 }

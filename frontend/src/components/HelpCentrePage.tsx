@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, CalendarDays, CircleHelp, CreditCard, Search, Settings, Shirt, Sparkles, Users } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, CircleHelp, CreditCard, Search, Settings, Shirt, Users } from 'lucide-react';
 import type { NavKey } from '../types';
 import './help-centre.css';
 
@@ -9,7 +9,7 @@ const topics: { title: string; description: string; section: NavKey; icon: typeo
   { title: 'Appointments', description: 'Manage bookings and public booking settings.', section: 'Appointments', icon: CalendarDays },
   { title: 'Billing and payments', description: 'Create invoices and record customer payments.', section: 'Billing', icon: CreditCard },
   { title: 'Business profile', description: 'Update your business details, currency, and location.', section: 'Business Profile', icon: Settings },
-  { title: 'AI Assistant', description: 'Ask questions about your saved business records.', section: 'AI', icon: Sparkles },
+  { title: 'AI Assistant', description: 'Ask questions about your saved business records.', section: 'AI', icon: Activity },
 ];
 
 const articles = [
