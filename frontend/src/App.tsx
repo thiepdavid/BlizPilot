@@ -103,6 +103,16 @@ export default function App() {
   }, [session?.access_token, backendDataMode]);
 
   useEffect(() => {
+    if (active !== 'Billing' || (supabase && (!session || backendDataMode !== 'supabase'))) return;
+    let current = true;
+    fetch(`${apiBase}/api/customers`, { headers: authHeaders })
+      .then(response => response.ok ? response.json() : Promise.reject())
+      .then((rows: typeof sampleCustomers) => { if (current) setCustomers(rows.map(decorateCustomer)); })
+      .catch(() => undefined);
+    return () => { current = false; };
+  }, [active, apiBase, session?.access_token, backendDataMode]);
+
+  useEffect(() => {
     if (supabase && (!session || backendDataMode !== 'supabase')) return;
     let disposed = false;
     const refreshAppointments = async () => {
