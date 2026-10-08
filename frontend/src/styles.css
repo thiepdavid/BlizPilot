@@ -91,3 +91,11 @@ html{min-width:320px;overflow-x:hidden}body,#root,.app-shell,.main-area,.content
 .app-shell .stripe-connect-panel{background:#111c2d;border-color:#26364c;color:#e7edf7}.stripe-connect-panel .stripe-connect-copy strong{color:#f0f4fb}.stripe-connect-panel .stripe-connect-copy p,.stripe-connect-panel .stripe-connect-hint{color:#91a0b5}
 @media(max-width:380px){.content-area{padding-left:10px;padding-right:10px}.metrics-grid{gap:7px}.metric-card{padding:10px}.metric-value{font-size:18px}.page-heading h1{font-size:19px}.page-heading p{max-width:190px}.page-heading>.primary-button{padding:8px;font-size:8px}.invoice-summary-card{grid-template-columns:30px minmax(0,1fr);column-gap:7px}.invoice-summary-icon{width:29px;height:29px}.topbar-actions{gap:3px}.records-export-grid{grid-template-columns:1fr}}
 @media(hover:none){button:hover{filter:none}}
+
+/* Keep the shared workspace visible while an individual page chunk loads. */
+.page-loading{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;min-height:260px;padding:16px 0}
+.page-loading i{display:block;min-height:112px;border:1px solid #26364c;border-radius:10px;background:linear-gradient(90deg,#111c2d,#17253b,#111c2d);background-size:200% 100%;animation:page-loading-shimmer 1.25s ease-in-out infinite}
+.page-loading i:first-of-type{grid-column:1/-1;min-height:72px}
+@keyframes page-loading-shimmer{to{background-position:-200% 0}}
+@media(max-width:620px){.page-loading{grid-template-columns:1fr;gap:10px}.page-loading i,.page-loading i:first-of-type{min-height:88px}}
+@media(prefers-reduced-motion:reduce){.page-loading i{animation:none}}
