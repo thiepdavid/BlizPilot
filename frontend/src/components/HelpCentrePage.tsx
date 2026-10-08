@@ -8,7 +8,7 @@ const topics: { title: string; description: string; section: NavKey; icon: typeo
   { title: 'Customers', description: 'Keep customer details and purchase history together.', section: 'Customers', icon: Users },
   { title: 'Appointments', description: 'Manage bookings and public booking settings.', section: 'Appointments', icon: CalendarDays },
   { title: 'Billing and payments', description: 'Create invoices and record customer payments.', section: 'Billing', icon: CreditCard },
-  { title: 'Business profile', description: 'Update your business details, currency, and location.', section: 'Settings', icon: Settings },
+  { title: 'Business profile', description: 'Update your business details, currency, and location.', section: 'Business Profile', icon: Settings },
   { title: 'AI Assistant', description: 'Ask questions about your saved business records.', section: 'AI', icon: Sparkles },
 ];
 
@@ -19,7 +19,7 @@ const articles = [
   { question: 'What does the low-stock alert mean?', answer: 'A variant is flagged when its quantity is at or below the alert level saved for that variant. You can set the alert level when adding a product.', section: 'Inventory' as NavKey },
   { question: 'How do I create a bill for a customer?', answer: 'Open Billing and choose Create invoice. Select a customer, add the items or services, review the amounts, then save the invoice.', section: 'Billing' as NavKey },
   { question: 'How do I record money received?', answer: 'Open Payments and record a payment against the relevant invoice. BizPilot updates the paid and outstanding amounts for that invoice.', section: 'Payments' as NavKey },
-  { question: 'Can I change my business currency?', answer: 'Open Settings and choose a currency. Currency changes are restricted after you have saved prices or financial records, to avoid misrepresenting existing amounts.', section: 'Settings' as NavKey },
+  { question: 'Can I change my business currency?', answer: 'Open Business Profile and choose a currency. Currency changes are restricted after you have saved prices or financial records, to avoid misrepresenting existing amounts.', section: 'Business Profile' as NavKey },
   { question: 'Why might the AI Assistant not answer?', answer: 'The assistant needs a working API connection and available provider credits. If it is temporarily unavailable, try again later; your other BizPilot sections continue to work.', section: 'AI' as NavKey },
 ];
 
