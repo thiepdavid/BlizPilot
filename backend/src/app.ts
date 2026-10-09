@@ -12,6 +12,7 @@ import { businessAuth, supabaseConfigured } from './supabase.js';
 import { AuthenticatedRequest } from './supabase.js';
 import { handleRazorpayWebhook } from './razorpay.js';
 import { createStripePaymentLink, getStripeAccountStatus, handleStripeConnectWebhook, startStripeOnboarding } from './stripeConnect.js';
+import { assertCanCreateInventoryVariant, createBizPilotCheckout, createBizPilotPortal, getBizPilotSubscription, handleBizPilotSubscriptionWebhook } from './stripeSubscriptions.js';
 import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
 import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
 import { getExchangeRate } from './exchangeRates.js';
@@ -51,6 +52,7 @@ app.use('/api', (request, response, next) => {
 });
 app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
 app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeConnectWebhook);
+app.post('/api/subscription/stripe/webhook', express.raw({ type: 'application/json' }), handleBizPilotSubscriptionWebhook);
 app.use(express.json({ limit: '64kb', strict: true }));
 app.use((request, response, next) => {
   if (request.body === undefined) return next();
@@ -435,8 +437,10 @@ app.post('/api/inventory', async (request, response, next) => {
   try {
     const input = { name: name.trim(), category: (category as string).trim(), sku: (sku as string).trim(), size: (size as string).trim(), color: (color as string).trim(), costPrice: Math.round(cost * 100) / 100, sellingPrice: Math.round(price * 100) / 100, quantity: stock, lowStockAt: lowStock };
     const cloud = (request as AuthenticatedRequest).businessContext;
+    if (cloud) await assertCanCreateInventoryVariant(cloud);
     response.status(201).json(cloud ? await cloudCreateInventoryItem(cloud, input) : await createInventoryItem(input));
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'PRO_FEATURE_REQUIRED') { response.status(403).json({ error: error instanceof Error ? error.message : 'Upgrade to Pro for unlimited variants.', code: 'PRO_FEATURE_REQUIRED' }); return; }
     if (error instanceof Error && /unique|duplicate/i.test(error.message)) { response.status(409).json({ error: 'That SKU is already in use.' }); return; }
     if (error instanceof Error && /inventory_items|schema cache/i.test(error.message)) { response.status(503).json({ error: 'Inventory is not installed in the database yet. Run database/business-type-inventory.sql in Supabase.' }); return; }
     next(error);
@@ -657,6 +661,43 @@ app.post('/api/payments/stripe/connect', async (request, response) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Stripe could not start account onboarding.';
     const setupIssue = message.includes('not configured') || message.includes('Set CLIENT_ORIGIN') || message.includes('Secure payment account storage');
+    response.status(setupIssue ? 503 : 400).json({ error: message });
+  }
+});
+
+app.use('/api/subscription', businessAuth);
+app.get('/api/subscription', async (request, response, next) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'BizPilot subscriptions require a signed-in business.' }); return; }
+    response.json(await getBizPilotSubscription(context));
+  } catch (error) { next(error); }
+});
+
+app.post('/api/subscription/checkout', async (request, response) => {
+  const interval = request.body?.interval;
+  if (interval !== 'month' && interval !== 'year') {
+    response.status(400).json({ error: 'Choose monthly or yearly billing.' }); return;
+  }
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'BizPilot subscriptions require a signed-in business.' }); return; }
+    response.json(await createBizPilotCheckout(context, interval));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not open subscription checkout.';
+    const setupIssue = message.includes('not configured') || message.includes('Set CLIENT_ORIGIN') || message.includes('Secure subscription storage');
+    response.status(setupIssue ? 503 : 400).json({ error: message });
+  }
+});
+
+app.post('/api/subscription/portal', async (request, response) => {
+  try {
+    const context = (request as AuthenticatedRequest).businessContext;
+    if (!context) { response.status(400).json({ error: 'BizPilot subscriptions require a signed-in business.' }); return; }
+    response.json(await createBizPilotPortal(context));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not open subscription management.';
+    const setupIssue = message.includes('not configured') || message.includes('Set CLIENT_ORIGIN') || message.includes('Secure subscription storage');
     response.status(setupIssue ? 503 : 400).json({ error: message });
   }
 });

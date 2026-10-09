@@ -150,7 +150,7 @@ export async function createStripePaymentLink(context: BusinessContext, invoiceI
   return { url: session.url, amount: amount / (10 ** currencyDigits(currency)), provider: 'Stripe' as const };
 }
 
-function verifyStripeSignature(payload: Buffer, signature: string, secret: string) {
+export function verifyStripeSignature(payload: Buffer, signature: string, secret: string) {
   const parts = signature.split(',').map(part => part.split('=', 2));
   const timestamp = parts.find(([key]) => key === 't')?.[1];
   const signatures = parts.filter(([key]) => key === 'v1').map(([, value]) => value);

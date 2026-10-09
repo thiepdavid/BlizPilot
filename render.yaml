@@ -30,6 +30,12 @@ services:
         sync: false
       - key: STRIPE_CONNECT_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_BIZPILOT_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_BIZPILOT_PRO_MONTHLY_PRICE_ID
+        sync: false
+      - key: STRIPE_BIZPILOT_PRO_YEARLY_PRICE_ID
+        sync: false
       - key: CLIENT_ORIGIN
         value: https://blizpilot-alpha.vercel.app
       - key: CORS_ORIGIN
