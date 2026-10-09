@@ -23,6 +23,9 @@ export const app = express();
 app.set('trust proxy', 1);
 const allowedOrigins = new Set((process.env.CORS_ORIGIN ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173'))
   .split(',').map(origin => origin.trim()).filter(Boolean));
+// Capacitor's local WebView origins for the packaged iOS and Android apps.
+allowedOrigins.add('capacitor://localhost');
+allowedOrigins.add('http://localhost');
 app.use((_request, response, next) => {
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('X-Frame-Options', 'DENY');

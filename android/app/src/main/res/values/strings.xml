@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BizPilot</string>
+    <string name="title_activity_main">BizPilot</string>
+    <string name="package_name">com.bizpilot.app</string>
+    <string name="custom_url_scheme">com.bizpilot.app</string>
+</resources>

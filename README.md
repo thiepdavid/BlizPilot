@@ -13,6 +13,29 @@ bizpilot/
 └── README.md
 ```
 
+## iOS and Android app foundation
+
+The frontend is prepared to be packaged as native iOS and Android apps with Capacitor. The mobile apps load the same BizPilot interface and use the hosted BizPilot API and Supabase project; they do not run the Express server on the phone.
+
+### Create the native projects
+
+Use a Mac with current Xcode for iOS, and Android Studio with its SDK installed for Android. From the project root:
+
+```bash
+npm install
+npm run mobile:build
+npm run mobile:add:ios
+npm run mobile:add:android
+npm run mobile:sync
+npm run mobile:open:ios
+```
+
+Open the Android project with `npm run mobile:open:android`. After frontend changes, run `npm run mobile:sync` to rebuild the web assets and copy them into both native projects. iOS builds and App Store uploads require an Apple Developer account; Play Store releases require a Google Play developer account.
+
+Set `VITE_API_URL` in `frontend/.env` to the deployed Render API URL before building the mobile apps. The API automatically allows Capacitor's local WebView origins `capacitor://localhost` (iOS) and `http://localhost` (Android); keep the website origin in Render's `CORS_ORIGIN`. In Supabase Auth URL Configuration, add the app's eventual deep-link callback URL before enabling native email-confirmation or OAuth return flows. The current app has not yet been configured with a branded deep link or push notifications.
+
+This is only the native packaging foundation. Before store submission, configure app icons, launch screens, privacy disclosures, platform permissions, deep links, and store-specific subscriptions. Stripe Checkout/subscriptions on the website do not provide Apple In-App Purchase or Google Play Billing; those purchase flows and server-side receipt/transaction validation still need implementation and store product configuration. Do not advertise native subscription purchases until those flows are complete.
+
 ## Included features
 
 - Business dashboard with sales, appointments, outstanding invoices, returning customers, and expenses
@@ -29,7 +52,7 @@ bizpilot/
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 22 or newer (required by the Capacitor mobile tooling)
 - npm 10 or newer
 - A Supabase project only if you want cloud storage and sign-in; demo mode can run without it
 
