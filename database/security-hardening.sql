@@ -1,7 +1,6 @@
 -- These are trigger/event-trigger functions. They are invoked by PostgreSQL,
 -- not through the Supabase RPC API, so application roles do not need EXECUTE.
 REVOKE EXECUTE ON FUNCTION public.handle_bizpilot_signup() FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
 
 -- Anonymous visitors use the API for booking requests. Keeping this write RPC
 -- service-role-only ensures they cannot bypass API validation and rate limits.

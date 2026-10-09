@@ -200,6 +200,7 @@ export async function handleStripeConnectWebhook(request: Request, response: Res
       payment_method: method,
       target_stripe_payment_intent_id: paymentIntentId,
       target_currency_code: currency,
+      target_stripe_account_id: connectedAccountId,
     });
     if (error) throw error;
     response.json({ received: true });

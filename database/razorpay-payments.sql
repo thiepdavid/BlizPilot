@@ -4,9 +4,10 @@
 create table if not exists public.razorpay_processed_payments (
   razorpay_payment_id text primary key,
   business_id uuid not null references public.businesses(id) on delete cascade,
-  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  invoice_id uuid not null,
   amount numeric(12, 2) not null check (amount > 0),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  foreign key (invoice_id, business_id) references public.invoices(id, business_id) on delete cascade
 );
 
 alter table public.razorpay_processed_payments enable row level security;
@@ -21,11 +22,12 @@ create or replace function public.record_bizpilot_razorpay_payment(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   invoice_total numeric(12, 2);
   invoice_paid numeric(12, 2);
+  invoice_customer_id uuid;
   inserted_rows integer;
 begin
   if target_razorpay_payment_id is null or length(target_razorpay_payment_id) < 5 then
@@ -35,8 +37,8 @@ begin
     raise exception 'Invalid Razorpay payment method';
   end if;
 
-  select total, coalesce(paid_amount, 0)
-    into invoice_total, invoice_paid
+  select customer_id, total, coalesce(paid_amount, 0)
+    into invoice_customer_id, invoice_total, invoice_paid
     from public.invoices
     where id = target_invoice_id and business_id = target_business_id
     for update;
@@ -51,8 +53,8 @@ begin
   get diagnostics inserted_rows = row_count;
   if inserted_rows = 0 then return; end if;
 
-  insert into public.payments(business_id, invoice_id, amount, method, paid_at)
-  values (target_business_id, target_invoice_id, payment_amount, payment_method, now());
+  insert into public.payments(business_id, invoice_id, customer_id, amount, method, paid_at)
+  values (target_business_id, target_invoice_id, invoice_customer_id, payment_amount, payment_method, now());
 
   update public.invoices
     set paid_amount = invoice_paid + payment_amount,

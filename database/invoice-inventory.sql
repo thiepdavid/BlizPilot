@@ -8,8 +8,8 @@ CREATE OR REPLACE FUNCTION public.create_bizpilot_invoice_with_inventory(
   target_due_date date
 ) RETURNS uuid
 LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = public, pg_temp
+SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   active_business_id uuid;
@@ -84,5 +84,5 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_bizpilot_invoice_with_inventory(uuid, text, jsonb, numeric, date) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.create_bizpilot_invoice_with_inventory(uuid, text, jsonb, numeric, date) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.create_bizpilot_invoice_with_inventory(uuid, text, jsonb, numeric, date) TO authenticated;

@@ -50,11 +50,9 @@ If you already have `.env` files with your own values, keep them and skip the co
 
 ## Supabase setup
 
-1. Create a Supabase project.
-2. In the Supabase SQL Editor, run `database/schema.sql`.
-3. In Supabase Authentication URL Configuration, set the Site URL to `http://localhost:5173` and add it as a redirect URL.
-4. Copy the project URL and its publishable key (or legacy anon key) into both environment files. Use the variable names shown below.
-5. Restart BizPilot, create an account, and confirm the email if Supabase requires it.
+Create a Supabase project and follow the ordered SQL setup in [`database/README.md`](database/README.md). It includes the core schema, signup trigger, tenant-scoped RLS policies, and required feature migrations. In Supabase Authentication URL Configuration, set the local Site URL to `http://localhost:5173` and add it as a redirect URL. Then copy the project URL and publishable key (or legacy anon key) into both environment files and restart BizPilot.
+
+`database/schema.sql` is for a **new** Supabase project. For a database already in use, back it up and compare its live schema before applying any SQL. Do not run the bootstrap over production data as a shortcut.
 
 Use the same Supabase project URL and key in both apps:
 
@@ -108,7 +106,7 @@ The signed-in app provides **Settings → Delete account**. Run `database/accoun
 
 Each business connects its own Stripe account. Checkout charges are created directly on that connected account, so payment proceeds settle to that business rather than a shared BizPilot account. Stripe verifies the business through its hosted onboarding. What the customer can use at checkout depends on the connected account's country, currency, Stripe approval, and enabled payment methods.
 
-1. In Supabase SQL Editor, run `database/stripe-connect-payments.sql` once. It creates a private mapping from BizPilot businesses to connected Stripe accounts and an idempotent, server-only payment recording function.
+1. Apply `database/stripe-connect-payments.sql` as part of the ordered setup in [`database/README.md`](database/README.md). It creates a private mapping from BizPilot businesses to connected Stripe accounts and an idempotent, server-only payment recording function.
 2. BizPilot needs a Stripe Connect platform account in a country where Stripe supports it. Add the platform's **test secret key** as `STRIPE_SECRET_KEY` in Render → `bizpilot-api` → **Environment**. Also set `CLIENT_ORIGIN` to the exact deployed frontend origin, such as `https://blizpilot-alpha.vercel.app`. Keep the Stripe key and Supabase service-role key on the backend only.
 3. In Stripe Dashboard → **Webhooks**, create a Connect webhook that listens to events from connected accounts. Set the endpoint URL to `https://bizpilot-api-t8bl.onrender.com/api/payments/stripe/webhook` and select `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Save its signing secret in Render as `STRIPE_CONNECT_WEBHOOK_SECRET`.
 4. Save the Render environment changes and redeploy the API. In BizPilot, open **Payments → Connect Stripe** for each business and complete Stripe's hosted onboarding. The business country must already be selected in Settings.

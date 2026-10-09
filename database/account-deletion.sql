@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION public.delete_bizpilot_user_data(p_user_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = public
+SET search_path = ''
 AS $$
 BEGIN
   IF p_user_id IS NULL THEN

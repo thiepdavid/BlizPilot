@@ -8,3 +8,5 @@ ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS region text,
   ADD COLUMN IF NOT EXISTS postal_code text,
   ADD COLUMN IF NOT EXISTS tax_id text;
+
+GRANT UPDATE (country, address_line1, city, district, region, postal_code, tax_id, updated_at) ON public.businesses TO authenticated;

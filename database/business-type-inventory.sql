@@ -25,6 +25,37 @@ CREATE TABLE IF NOT EXISTS public.inventory_items (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Currency is a unit label for saved prices, not a conversion operation.
+-- Enforce the app's lock server-side so direct API updates cannot relabel old
+-- invoice/payment amounts after business records exist.
+CREATE OR REPLACE FUNCTION public.guard_bizpilot_currency_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  table_name text;
+  has_records boolean;
+BEGIN
+  IF OLD.currency_code IS NOT DISTINCT FROM NEW.currency_code THEN RETURN NEW; END IF;
+  FOREACH table_name IN ARRAY ARRAY['services','invoices','payments','expenses','inventory_items'] LOOP
+    IF pg_catalog.to_regclass('public.' || table_name) IS NOT NULL THEN
+      EXECUTE pg_catalog.format('SELECT EXISTS (SELECT 1 FROM public.%I WHERE business_id = $1)', table_name)
+        INTO has_records USING OLD.id;
+      IF has_records THEN
+        RAISE EXCEPTION 'Business currency is locked after prices or financial records have been added. Existing amounts are not converted.';
+      END IF;
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS businesses_guard_currency_change ON public.businesses;
+CREATE TRIGGER businesses_guard_currency_change
+  BEFORE UPDATE OF currency_code ON public.businesses
+  FOR EACH ROW EXECUTE FUNCTION public.guard_bizpilot_currency_change();
+
 ALTER TABLE public.inventory_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS inventory_items_business_access ON public.inventory_items;
 CREATE POLICY inventory_items_business_access ON public.inventory_items
@@ -35,3 +66,5 @@ CREATE POLICY inventory_items_business_access ON public.inventory_items
 CREATE INDEX IF NOT EXISTS inventory_items_business_name_idx ON public.inventory_items (business_id, name);
 CREATE UNIQUE INDEX IF NOT EXISTS inventory_items_business_sku_idx ON public.inventory_items (business_id, lower(sku)) WHERE sku <> '';
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.inventory_items TO authenticated;
+
+GRANT UPDATE (business_type, updated_at) ON public.businesses TO authenticated;
