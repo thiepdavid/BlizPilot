@@ -41,8 +41,16 @@ function savedLaunchPage(): NavKey {
 }
 
 function initialPage(): NavKey {
-  const params = new URLSearchParams(window.location.search);
-  return params.has('payments') ? 'Payments' : params.has('subscription') ? 'Settings' : savedLaunchPage();
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('payments')) {
+    // Payment-provider returns should open Payments once, then stop overriding
+    // the saved launch page on every refresh.
+    url.searchParams.delete('payments');
+    const query = url.searchParams.toString();
+    window.history.replaceState(window.history.state, '', `${url.pathname}${query ? `?${query}` : ''}${url.hash}`);
+    return 'Payments';
+  }
+  return url.searchParams.has('subscription') ? 'Settings' : savedLaunchPage();
 }
 
 export default function App() {
