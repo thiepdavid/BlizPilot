@@ -112,6 +112,12 @@ export async function cloudUpdateAppointmentStatus(context: BusinessContext, app
   return { id: data.id, businessId: data.business_id, customerId: data.customer_id, customerName: data.customers?.full_name ?? 'Customer', service: data.service_name ?? 'Service', startsAt: data.starts_at, durationMinutes: data.duration_minutes ?? 45, status, createdAt: data.created_at };
 }
 
+export async function cloudDeleteAppointment(context: BusinessContext, appointmentId: string) {
+  const { data, error } = await context.client.from('appointments').delete().eq('id', appointmentId).eq('business_id', context.businessId).select('id').maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Appointment not found.');
+}
+
 export async function cloudUpdateAppointmentSchedule(context: BusinessContext, appointmentId: string, startsAt: string, durationMinutes: number) {
   const endsAt = new Date(new Date(startsAt).getTime() + durationMinutes * 60_000).toISOString();
   const { data: conflicts, error: conflictError } = await context.client.from('appointments').select('id').eq('business_id', context.businessId).neq('id', appointmentId).lt('starts_at', endsAt).gt('ends_at', startsAt).neq('status', 'cancelled').neq('status', 'no_show').limit(1);

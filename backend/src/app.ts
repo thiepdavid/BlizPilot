@@ -2,7 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { createCustomer, listCustomers, updateCustomer } from './customers.js';
-import { createAppointment, listAppointments, updateAppointmentStatus, updateAppointmentSchedule, type AppointmentRecord } from './appointments.js';
+import { createAppointment, listAppointments, updateAppointmentStatus, updateAppointmentSchedule, deleteAppointment, type AppointmentRecord } from './appointments.js';
 import { createInvoice, listInvoices } from './invoices.js';
 import { createPayment, listPayments, type PaymentRecord } from './payments.js';
 import { archiveService, createService, listServices, updateService } from './services.js';
@@ -14,7 +14,7 @@ import { handleRazorpayWebhook } from './razorpay.js';
 import { createStripePaymentLink, getStripeAccountStatus, handleStripeConnectWebhook, startStripeOnboarding } from './stripeConnect.js';
 import { assertCanCreateInventoryVariant, createBizPilotCheckout, createBizPilotPortal, getBizPilotSubscription, handleBizPilotSubscriptionWebhook } from './stripeSubscriptions.js';
 import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
-import { cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
+import { cloudDeleteAppointment, cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
 import { getExchangeRate } from './exchangeRates.js';
 import { createInventoryItem, listInventory, updateInventoryStock } from './inventory.js';
 import { sanitizeSubmittedValues } from './inputSafety.js';
@@ -555,6 +555,18 @@ app.patch('/api/appointments/:id/schedule', async (request, response, next) => {
     response.json(updated);
   } catch (error) {
     if (error instanceof Error && error.message.includes('overlaps another appointment')) { response.status(409).json({ error: error.message }); return; }
+    next(error);
+  }
+});
+
+app.delete('/api/appointments/:id', async (request, response, next) => {
+  try {
+    const cloud = (request as AuthenticatedRequest).businessContext;
+    if (cloud) await cloudDeleteAppointment(cloud, request.params.id);
+    else await deleteAppointment(request.params.id);
+    response.status(204).end();
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Appointment not found.') { response.status(404).json({ error: error.message }); return; }
     next(error);
   }
 });

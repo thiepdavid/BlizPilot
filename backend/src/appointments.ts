@@ -88,3 +88,15 @@ export async function updateAppointmentSchedule(id: string, startsAt: string, du
   });
   pendingWrite = task.then(() => undefined, () => undefined); await task; return updated;
 }
+
+export async function deleteAppointment(id: string): Promise<void> {
+  const task = pendingWrite.then(async () => {
+    const appointments = await readStore();
+    const index = appointments.findIndex(item => item.id === id);
+    if (index < 0) throw new Error('Appointment not found.');
+    appointments.splice(index, 1);
+    await writeFile(filePath, `${JSON.stringify(appointments, null, 2)}\n`, 'utf8');
+  });
+  pendingWrite = task.then(() => undefined, () => undefined);
+  await task;
+}
