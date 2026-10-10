@@ -67,20 +67,18 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
       </div>
     </section>
 
-    <section className="panel settings-panel app-settings-panel subscription-panel" aria-labelledby="subscription-heading">
+    {subscription && (subscription.configured || subscription.plan === 'pro' || subscription.hasBillingAccount) && <section className="panel settings-panel app-settings-panel subscription-panel" aria-labelledby="subscription-heading">
       <div className="settings-heading"><div className="settings-icon"><CreditCard size={18}/></div><div><h2 id="subscription-heading">Plan and billing</h2><p>Manage the BizPilot subscription for this business. Customer invoice payments remain separate.</p></div></div>
       <div className="subscription-current"><span>Current plan</span><strong>{subscription?.plan === 'pro' ? 'BizPilot Pro' : 'Free'}</strong><small>{subscriptionLoading ? 'Refreshing plan…' : subscription?.status && subscription.status !== 'free' ? `Status: ${subscription.status.replace(/_/g, ' ')}` : 'No paid subscription'}</small></div>
       {subscription?.configured && subscription.plan !== 'pro' && <p className="subscription-note">Free includes core sales, customer, and stock tracking with up to {subscription.features.inventoryVariantLimit ?? 50} product variants. Pro adds unlimited variants, low-stock alerts, and detailed sales and profit reports.</p>}
-      {!subscription?.configured && <p className="subscription-note">BizPilot Pro is being prepared. Your current tools remain available while subscription billing is set up.</p>}
       {subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd && <p className="subscription-note">Pro access is scheduled to end on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}.</p>}
       {subscriptionNotice && <p className="settings-success" role="status">{subscriptionNotice}</p>}
       {subscriptionLoading && <p className="subscription-note">Loading available plans…</p>}
       {!subscriptionLoading && subscription?.configured && subscription.plan !== 'pro' && <div className="subscription-offers">{subscription.offers.map(offer => <article className="subscription-offer" key={offer.key}><div><strong>{offer.productName}</strong><span>{new Intl.NumberFormat(undefined, { style: 'currency', currency: offer.currency }).format(offer.amount)} / {offer.interval === 'month' ? 'month' : 'year'}</span></div><button type="button" className="primary-button" disabled={billingBusy || !subscription.canManage} onClick={() => void runBillingAction(() => onChooseSubscription?.(offer.interval) ?? Promise.resolve())}>{billingBusy ? 'Opening…' : `Choose ${offer.interval === 'month' ? 'monthly' : 'yearly'}`}</button></article>)}</div>}
-      {!subscriptionLoading && !subscription?.configured && <p className="subscription-note">Subscription checkout is not set up yet. BizPilot Pro plans will appear here once billing is configured.</p>}
       {subscription?.hasBillingAccount && subscription.canManage && <button type="button" className="secondary-button subscription-manage" disabled={billingBusy} onClick={() => void runBillingAction(() => onManageSubscription?.() ?? Promise.resolve())}>{billingBusy ? 'Opening…' : 'Manage subscription'}</button>}
       {subscription && !subscription.canManage && <p className="subscription-note">Ask the business owner to manage the subscription.</p>}
       {billingError && <p className="form-error" role="alert">{billingError}</p>}
-    </section>
+    </section>}
 
     <section className="panel settings-panel app-settings-panel">
       <div className="settings-heading"><div className="settings-icon"><Building2 size={18}/></div><div><h2>Business profile</h2><p>Business name, owner, country, address, tax details, and currency.</p></div></div>
