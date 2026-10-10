@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.bizpilot.app',
+  appId: 'com.thiepdavidthiep.blizpilot',
   appName: 'BizPilot',
   webDir: 'frontend/dist',
   server: {

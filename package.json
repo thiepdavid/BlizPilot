@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
-    "mobile:build": "CAPACITOR_BUILD=1 npm run build -w frontend",
+    "mobile:build": "CAPACITOR_BUILD=1 VITE_API_URL=${BIZPILOT_API_URL:-https://bizpilot-api-t8bl.onrender.com} npm run build -w frontend",
     "mobile:sync": "npm run mobile:build && cap sync",
     "mobile:add:ios": "cap add ios",
     "mobile:add:android": "cap add android",

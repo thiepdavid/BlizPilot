@@ -1,4 +1,4 @@
-package com.bizpilot.app;
+package com.thiepdavidthiep.blizpilot;
 
 import com.getcapacitor.BridgeActivity;
 

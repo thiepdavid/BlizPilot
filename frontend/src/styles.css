@@ -90,6 +90,48 @@ html{min-width:320px;overflow-x:hidden}body,#root,.app-shell,.main-area,.content
 @media(prefers-color-scheme:dark){.customer-modal .modal-actions{background:#111c2d;border-color:#26364c}}
 .app-shell .stripe-connect-panel{background:#111c2d;border-color:#26364c;color:#e7edf7}.stripe-connect-panel .stripe-connect-copy strong{color:#f0f4fb}.stripe-connect-panel .stripe-connect-copy p,.stripe-connect-panel .stripe-connect-hint{color:#91a0b5}
 @media(max-width:380px){.content-area{padding-left:10px;padding-right:10px}.metrics-grid{gap:7px}.metric-card{padding:10px}.metric-value{font-size:18px}.page-heading h1{font-size:19px}.page-heading p{max-width:190px}.page-heading>.primary-button{padding:8px;font-size:8px}.invoice-summary-card{grid-template-columns:30px minmax(0,1fr);column-gap:7px}.invoice-summary-icon{width:29px;height:29px}.topbar-actions{gap:3px}.records-export-grid{grid-template-columns:1fr}}
+
+/* Keep the mobile toolbar and navigation below iPhone's status bar and notch. */
+@media(max-width:820px){
+  .topbar{height:calc(58px + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px)}
+  .mobile-menu{top:calc(13px + env(safe-area-inset-top,0px))}
+  .sidebar{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(15px + env(safe-area-inset-bottom,0px))}
+  .mobile-close{top:calc(10px + env(safe-area-inset-top,0px))}
+}
+
+/* Keep nested lists and dialogs responsive to touch across mobile WebViews. */
+.sidebar,
+.global-search-results,
+.notifications-list,
+.modal-backdrop,
+.customer-modal,
+.customer-profile-modal,
+.invoice-document,
+.import-modal,
+.import-preview,
+.address-suggestions,
+.inventory-import-preview,
+.bizpilot-chat-messages,
+.action-menu-panel{
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+}
+.section-table{
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-x:contain;
+}
+html{scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* A modest mobile text-size boost improves readability without changing layout. */
+@media(max-width:820px){
+  html{-webkit-text-size-adjust:108%;text-size-adjust:108%}
+}
+
+/* iOS zooms the whole page when a focused form control uses text below 16px. */
+@supports (-webkit-touch-callout:none){
+  input,select,textarea{font-size:16px!important}
+}
 @media(hover:none){button:hover{filter:none}}
 
 /* Keep the shared workspace visible while an individual page chunk loads. */
@@ -99,3 +141,4 @@ html{min-width:320px;overflow-x:hidden}body,#root,.app-shell,.main-area,.content
 @keyframes page-loading-shimmer{to{background-position:-200% 0}}
 @media(max-width:620px){.page-loading{grid-template-columns:1fr;gap:10px}.page-loading i,.page-loading i:first-of-type{min-height:88px}}
 @media(prefers-reduced-motion:reduce){.page-loading i{animation:none}}
+.demo-preview-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 16px;background:#17376b;border-bottom:1px solid #31548c;color:#eaf1ff;font-size:12px;text-align:center}.demo-preview-banner strong{font-size:10px;letter-spacing:.1em;color:#a9c6ff}.demo-preview-banner span{color:#d3def2}@media(max-width:620px){.demo-preview-banner{flex-wrap:wrap;gap:3px 8px;padding:8px 12px;font-size:11px}}

@@ -133,6 +133,19 @@ export async function cloudUpdateCustomer(context: BusinessContext, customerId: 
   return { id: data.id, businessId: data.business_id, name: data.full_name, email: data.email ?? '', phone: data.phone ?? '', notes: data.notes ?? '', visits: 0, lastVisit: '—', createdAt: data.created_at };
 }
 
+export async function cloudDeleteCustomer(context: BusinessContext, customerId: string) {
+  const [appointments, invoices] = await Promise.all([
+    context.client.from('appointments').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId).eq('customer_id', customerId),
+    context.client.from('invoices').select('id', { count: 'exact', head: true }).eq('business_id', context.businessId).eq('customer_id', customerId),
+  ]);
+  if (appointments.error) throw new Error(appointments.error.message);
+  if (invoices.error) throw new Error(invoices.error.message);
+  if ((appointments.count ?? 0) > 0 || (invoices.count ?? 0) > 0) throw new Error('This customer has appointment or invoice history. Keep the customer record to preserve that history.');
+  const { data, error } = await context.client.from('customers').delete().eq('id', customerId).eq('business_id', context.businessId).select('id').maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Customer not found. Refresh the list and try again.');
+}
+
 export async function cloudGetBusinessProfile(context: BusinessContext) {
   const business = check(await context.client.from('businesses').select('name,currency_code,business_type,country,address_line1,city,district,region,postal_code,tax_id').eq('id', context.businessId).single()) as Row;
   const profile = check(await context.client.from('users').select('full_name').eq('id', context.userId).single()) as Row;

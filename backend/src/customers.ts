@@ -61,3 +61,15 @@ export async function updateCustomer(id: string, input: { name: string; email: s
   });
   pendingWrite = task.then(() => undefined, () => undefined); await task; return updated;
 }
+
+export async function deleteCustomer(id: string): Promise<void> {
+  const task = pendingWrite.then(async () => {
+    const customers = await readStore();
+    const index = customers.findIndex(item => item.id === id);
+    if (index < 0) throw new Error('Customer not found.');
+    customers.splice(index, 1);
+    await writeFile(filePath, `${JSON.stringify(customers, null, 2)}\n`, 'utf8');
+  });
+  pendingWrite = task.then(() => undefined, () => undefined);
+  await task;
+}

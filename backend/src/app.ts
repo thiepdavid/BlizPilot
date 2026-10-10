@@ -1,7 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { createCustomer, listCustomers, updateCustomer } from './customers.js';
+import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { createAppointment, listAppointments, updateAppointmentStatus, updateAppointmentSchedule, deleteAppointment, type AppointmentRecord } from './appointments.js';
 import { createInvoice, listInvoices } from './invoices.js';
 import { createPayment, listPayments, type PaymentRecord } from './payments.js';
@@ -14,7 +14,7 @@ import { handleRazorpayWebhook } from './razorpay.js';
 import { createStripePaymentLink, getStripeAccountStatus, handleStripeConnectWebhook, startStripeOnboarding } from './stripeConnect.js';
 import { assertCanCreateInventoryVariant, createBizPilotCheckout, createBizPilotPortal, getBizPilotSubscription, handleBizPilotSubscriptionWebhook } from './stripeSubscriptions.js';
 import { createPublicBookingRequest, ensurePublicBookingPage, getBusinessBookingClosures, getBusinessBookingHours, getPublicBookingBusyTimes, getPublicBookingPage, publicBookingRateLimit, saveBusinessBookingClosures, saveBusinessBookingHours, saveBusinessBookingTimezone } from './publicBooking.js';
-import { cloudDeleteAppointment, cloudCreateAppointment, cloudCreateCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
+import { cloudDeleteAppointment, cloudCreateAppointment, cloudCreateCustomer, cloudDeleteCustomer, cloudUpdateCustomer, cloudGetBusinessProfile, cloudUpdateBusinessProfile, cloudCreateInvoice, cloudCreatePayment, cloudCreateService, cloudUpdateService, cloudArchiveService, cloudCreateExpense, cloudListExpenses, cloudListCampaigns, cloudCreateCampaign, cloudUpdateCampaign, cloudDeleteCampaign, cloudUpdateAppointmentStatus, cloudUpdateAppointmentSchedule, cloudListAppointments, cloudListCustomers, cloudListInvoices, cloudListPayments, cloudListServices, cloudCreateInventoryItem, cloudListInventory, cloudUpdateInventoryStock } from './cloudStore.js';
 import { getExchangeRate } from './exchangeRates.js';
 import { createInventoryItem, listInventory, updateInventoryStock } from './inventory.js';
 import { sanitizeSubmittedValues } from './inputSafety.js';
@@ -481,6 +481,33 @@ app.get('/api/customers', async (request, response, next) => {
     if (cloud) { response.json(await cloudListCustomers(cloud)); return; }
     response.json(await listCustomers());
   } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/customers/:id', async (request, response, next) => {
+  try {
+    const cloud = (request as AuthenticatedRequest).businessContext;
+    if (cloud) {
+      await cloudDeleteCustomer(cloud, request.params.id);
+    } else {
+      const [appointments, invoices] = await Promise.all([listAppointments(), listInvoices()]);
+      if (appointments.some(item => item.customerId === request.params.id) || invoices.some(item => item.customerId === request.params.id)) {
+        response.status(409).json({ error: 'This customer has appointment or invoice history. Keep the customer record to preserve that history.' });
+        return;
+      }
+      await deleteCustomer(request.params.id);
+    }
+    response.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('appointment or invoice history')) {
+      response.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof Error && error.message === 'Customer not found.') {
+      response.status(404).json({ error: error.message });
+      return;
+    }
     next(error);
   }
 });

@@ -1,0 +1,11 @@
+.customer-table{grid-template-columns:minmax(0,2fr) .6fr .8fr}
+.customer-name-cell{display:flex;align-items:center;gap:6px;min-width:0}
+.customer-name-cell .table-customer{flex:1;min-width:0}
+.customer-delete-button{display:grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid #2a3a53;border-radius:8px;background:#152237;color:#aab8cb;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.customer-delete-button:hover:not(:disabled){background:#482526;border-color:#7c3e42;color:#ffaaa4}
+.customer-delete-button:focus-visible{outline:2px solid #8cb6ff;outline-offset:2px}
+.customer-delete-button:disabled{cursor:not-allowed;opacity:.45}
+.customer-delete-spinner{width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:customer-delete-spin .7s linear infinite}
+.customer-delete-error{color:#ffaaa4}
+@keyframes customer-delete-spin{to{transform:rotate(360deg)}}
+@media(max-width:620px){.customer-table{grid-template-columns:minmax(0,1.6fr) .4fr .7fr;gap:5px;padding:10px 4px}.customer-name-cell{gap:3px}.customer-delete-button{width:26px;height:26px;flex:none}.customer-name-cell .table-customer{gap:5px}}
