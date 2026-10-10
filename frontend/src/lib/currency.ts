@@ -18,6 +18,7 @@ const storageKey = 'bizpilot-currency';
 
 export function getBusinessCurrencyCode(): CurrencyCode {
   try {
+    if (new URLSearchParams(window.location.search).get('demo') === 'boutique') return 'INR';
     const value = window.localStorage.getItem(storageKey);
     if (value && supportedCurrencies.includes(value)) return value;
   } catch { /* Use the default when browser storage is unavailable. */ }

@@ -10,6 +10,7 @@ import { BriefCard } from './components/BriefCard';
 import { SalesOverview } from './components/SalesOverview';
 import { ActionMenu } from './components/ActionMenu';
 import { appointments as sampleAppointments, customers as sampleCustomers } from './data/mockData';
+import { demoAppointments, demoBusiness, demoCampaigns, demoCustomers, demoExpenses, demoInventory, demoInvoices, demoPayments, demoServices } from './data/demoBoutique';
 import type { Appointment, Invoice, InvoiceLineItem, NavKey, Payment, Service, Expense, Campaign, BusinessType, InventoryItem } from './types';
 import { supabase } from './lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -32,6 +33,8 @@ import './styles.css';
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const launchPages: NavKey[] = ['Home', 'Customers', 'Services', 'Inventory', 'Appointments', 'Billing', 'Payments', 'Expenses', 'Reports', 'Marketing', 'AI'];
+const demoMode = new URLSearchParams(window.location.search).get('demo') === 'boutique';
+const demoReadOnly = () => new Error('This is a read-only demo preview. Your business records were not changed.');
 
 function savedLaunchPage(): NavKey {
   try {
@@ -42,6 +45,7 @@ function savedLaunchPage(): NavKey {
 
 function initialPage(): NavKey {
   const url = new URL(window.location.href);
+  if (url.searchParams.get('demo') === 'boutique') return 'Home';
   if (url.searchParams.has('payments')) {
     // Payment-provider returns should open Payments once, then stop overriding
     // the saved launch page on every refresh.
@@ -69,22 +73,22 @@ export default function App() {
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profileOverrides, setProfileOverrides] = useState<{ businessName: string; fullName: string; currencyCode?: string; businessType?: BusinessType } & Partial<BusinessLocation> | null>(() => { try { return JSON.parse(window.localStorage.getItem('bizpilot-profile') ?? 'null'); } catch { return null; } });
-  const [authReady, setAuthReady] = useState(!supabase);
+  const [profileOverrides, setProfileOverrides] = useState<{ businessName: string; fullName: string; currencyCode?: string; businessType?: BusinessType } & Partial<BusinessLocation> | null>(() => { if (demoMode) return demoBusiness; try { return JSON.parse(window.localStorage.getItem('bizpilot-profile') ?? 'null'); } catch { return null; } });
+  const [authReady, setAuthReady] = useState(demoMode || !supabase);
   const [backendDataMode, setBackendDataMode] = useState<'local' | 'supabase' | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
-  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(() => getBusinessCurrencyCode());
-  const [businessType, setBusinessType] = useState<BusinessType>(() => profileOverrides?.businessType ?? 'other');
-  const [businessLocation, setBusinessLocation] = useState<BusinessLocation>(() => ({ country: profileOverrides?.country ?? '', addressLine1: profileOverrides?.addressLine1 ?? '', city: profileOverrides?.city ?? '', district: profileOverrides?.district ?? '', region: profileOverrides?.region ?? '', postalCode: profileOverrides?.postalCode ?? '', taxId: profileOverrides?.taxId ?? '' }));
-  const [customers, setCustomers] = useState(sampleCustomers);
-  const [appointments, setAppointments] = useState(sampleAppointments);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(() => demoMode ? 'INR' : getBusinessCurrencyCode());
+  const [businessType, setBusinessType] = useState<BusinessType>(() => demoMode ? 'boutique' : profileOverrides?.businessType ?? 'other');
+  const [businessLocation, setBusinessLocation] = useState<BusinessLocation>(() => ({ country: demoMode ? demoBusiness.country : profileOverrides?.country ?? '', addressLine1: demoMode ? demoBusiness.addressLine1 : profileOverrides?.addressLine1 ?? '', city: demoMode ? demoBusiness.city : profileOverrides?.city ?? '', district: demoMode ? demoBusiness.district : profileOverrides?.district ?? '', region: demoMode ? demoBusiness.region : profileOverrides?.region ?? '', postalCode: demoMode ? demoBusiness.postalCode : profileOverrides?.postalCode ?? '', taxId: demoMode ? '' : profileOverrides?.taxId ?? '' }));
+  const [customers, setCustomers] = useState(demoMode ? demoCustomers : sampleCustomers);
+  const [appointments, setAppointments] = useState(demoMode ? demoAppointments : sampleAppointments);
+  const [invoices, setInvoices] = useState<Invoice[]>(demoMode ? demoInvoices : []);
+  const [payments, setPayments] = useState<Payment[]>(demoMode ? demoPayments : []);
+  const [services, setServices] = useState<Service[]>(demoMode ? demoServices : []);
+  const [expenses, setExpenses] = useState<Expense[]>(demoMode ? demoExpenses : []);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(demoMode ? demoCampaigns : []);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(demoMode ? demoInventory : []);
   const apiBase = import.meta.env.VITE_API_URL ?? '';
   const decorateCustomer = (customer: typeof sampleCustomers[number]) => ({ ...customer, initials: customer.name.split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase(), tone: customer.tone || ['peach', 'blue', 'lilac', 'mint'][customer.name.length % 4] });
   const decorateAppointment = (item: Appointment & { customerName?: string }) => {
@@ -93,18 +97,19 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!supabase) return;
+    if (demoMode || !supabase) return;
     void supabase.auth.getSession().then(({ data }) => setSession(data.session)).catch(() => undefined).finally(() => setAuthReady(true));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setAuthReady(true); });
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
+    if (demoMode) { setApiOnline(null); setBackendDataMode('local'); return; }
     fetch(`${apiBase}/api/health`).then(async response => { setApiOnline(response.ok); const data = await response.json(); setBackendDataMode(data.dataMode ?? 'local'); }).catch(() => { setApiOnline(false); setBackendDataMode(null); });
   }, [apiBase]);
 
   useEffect(() => {
-    if (!supabase || !session || backendDataMode !== 'supabase') return;
+    if (demoMode || !supabase || !session || backendDataMode !== 'supabase') return;
     let current = true;
     setSubscriptionLoading(true);
     fetch(`${apiBase}/api/subscription`, { headers: authHeaders })
@@ -121,7 +126,7 @@ export default function App() {
 
   const authHeaders: Record<string, string> = session ? { Authorization: `Bearer ${session.access_token}` } : {};
   useEffect(() => {
-    if (!supabase || !session || backendDataMode !== 'supabase') return;
+    if (demoMode || !supabase || !session || backendDataMode !== 'supabase') return;
     let current = true;
     fetch(`${apiBase}/api/business-profile`, { headers: authHeaders }).then(response => response.ok ? response.json() : Promise.reject()).then((profile: { currencyCode?: string; businessType?: BusinessType } & BusinessLocation) => {
       if (current) setBusinessLocation({ country: profile.country ?? '', addressLine1: profile.addressLine1 ?? '', city: profile.city ?? '', district: profile.district ?? '', region: profile.region ?? '', postalCode: profile.postalCode ?? '', taxId: profile.taxId ?? '' });
@@ -131,12 +136,12 @@ export default function App() {
     return () => { current = false; };
   }, [apiBase, session?.access_token, backendDataMode]);
   const metadata = session?.user.user_metadata ?? {};
-  const accountName = (!supabase && profileOverrides?.fullName) || (typeof metadata.full_name === 'string' && metadata.full_name.trim()) || session?.user.email?.split('@')[0] || 'Alex Morgan';
-  const businessName = (!supabase && profileOverrides?.businessName) || (typeof metadata.business_name === 'string' && metadata.business_name.trim()) || (session ? 'My Business' : 'Brightside Studio');
+  const accountName = demoMode ? demoBusiness.fullName : (!supabase && profileOverrides?.fullName) || (typeof metadata.full_name === 'string' && metadata.full_name.trim()) || session?.user.email?.split('@')[0] || 'Alex Morgan';
+  const businessName = demoMode ? demoBusiness.businessName : (!supabase && profileOverrides?.businessName) || (typeof metadata.business_name === 'string' && metadata.business_name.trim()) || (session ? 'My Business' : 'Brightside Studio');
   const firstName = accountName.split(/\s+/)[0] || 'there';
   const businessInitial = businessName.charAt(0).toUpperCase() || 'B';
   useEffect(() => {
-    if (supabase && (!session || backendDataMode !== 'supabase')) return;
+    if (demoMode || (supabase && (!session || backendDataMode !== 'supabase'))) return;
     fetch(`${apiBase}/api/customers`, { headers: authHeaders }).then(response => response.ok ? response.json() : Promise.reject()).then((rows: typeof sampleCustomers) => setCustomers(rows.map(decorateCustomer))).catch(() => undefined);
     fetch(`${apiBase}/api/appointments`, { headers: authHeaders }).then(response => response.ok ? response.json() : Promise.reject()).then((rows: Array<Appointment & { customerName?: string }>) => { knownAppointmentIds.current = new Set(rows.map(row => row.id)); setAppointments(rows.map(decorateAppointment)); }).catch(() => undefined);
     fetch(`${apiBase}/api/invoices`, { headers: authHeaders }).then(response => response.ok ? response.json() : Promise.reject()).then((rows: Invoice[]) => setInvoices(rows)).catch(() => undefined);
@@ -148,7 +153,7 @@ export default function App() {
   }, [session?.access_token, backendDataMode]);
 
   useEffect(() => {
-    if (active !== 'Billing' || (supabase && (!session || backendDataMode !== 'supabase'))) return;
+    if (demoMode || active !== 'Billing' || (supabase && (!session || backendDataMode !== 'supabase'))) return;
     let current = true;
     fetch(`${apiBase}/api/customers`, { headers: authHeaders })
       .then(response => response.ok ? response.json() : Promise.reject())
@@ -158,7 +163,7 @@ export default function App() {
   }, [active, apiBase, session?.access_token, backendDataMode]);
 
   useEffect(() => {
-    if (supabase && (!session || backendDataMode !== 'supabase')) return;
+    if (demoMode || (supabase && (!session || backendDataMode !== 'supabase'))) return;
     let disposed = false;
     const refreshAppointments = async () => {
       if (disposed || document.visibilityState !== 'visible') return;
@@ -185,6 +190,7 @@ export default function App() {
   }, [apiBase, session?.access_token, backendDataMode]);
 
   async function saveBusinessProfile(input: { businessName: string; fullName: string; currencyCode: CurrencyCode; businessType: BusinessType } & BusinessLocation) {
+    if (demoMode) throw demoReadOnly();
     if (supabase) {
       const response = await fetch(`${apiBase}/api/business-profile`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
       const result = await response.json();
@@ -201,6 +207,7 @@ export default function App() {
   }
 
   async function deleteAccount() {
+    if (demoMode) throw demoReadOnly();
     if (!supabase || !session) throw new Error('Sign in to delete your account.');
     const response = await fetch(`${apiBase}/api/account/delete`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmation: 'DELETE' }) });
     const result = await response.json().catch(() => ({})) as { error?: string };
@@ -211,12 +218,14 @@ export default function App() {
   }
 
   async function updateAccountPassword(password: string) {
+    if (demoMode) throw demoReadOnly();
     if (!supabase || !session) throw new Error('Sign in to update your password.');
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw new Error(error.message);
   }
 
   async function openSubscriptionCheckout(interval: SubscriptionInterval) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/subscription/checkout`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ interval }) });
     const result = await response.json().catch(() => ({})) as { url?: string; error?: string };
     if (!response.ok || !result.url) throw new Error(result.error ?? 'Could not open BizPilot checkout.');
@@ -224,6 +233,7 @@ export default function App() {
   }
 
   async function openSubscriptionPortal() {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/subscription/portal`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: '{}' });
     const result = await response.json().catch(() => ({})) as { url?: string; error?: string };
     if (!response.ok || !result.url) throw new Error(result.error ?? 'Could not open subscription management.');
@@ -242,6 +252,7 @@ export default function App() {
   }
 
   async function addCustomer(input: { name: string; email: string; phone: string; notes?: string }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/customers`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this customer.');
@@ -249,6 +260,7 @@ export default function App() {
   }
 
   async function rescheduleAppointment(id: string, startsAt: string, durationMinutes: number) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/appointments/${encodeURIComponent(id)}/schedule`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ startsAt, durationMinutes }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not reschedule this appointment.');
@@ -256,6 +268,7 @@ export default function App() {
   }
 
   async function updateAppointmentStatus(id: string, status: Appointment['status']) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/appointments/${encodeURIComponent(id)}/status`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not update the appointment.');
@@ -263,6 +276,7 @@ export default function App() {
   }
 
   async function updateCustomer(id: string, input: { name: string; email: string; phone: string; notes?: string }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/customers/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not update this customer.');
@@ -270,6 +284,7 @@ export default function App() {
   }
 
   async function addAppointment(input: { customerId: string; service: string; startsAt: string; durationMinutes: number }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/appointments`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this appointment.');
@@ -277,6 +292,7 @@ export default function App() {
   }
 
   async function getPublicBookingPage(timezone: string) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/public-booking/page`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not create your booking page.');
@@ -284,6 +300,7 @@ export default function App() {
   }
 
   async function getPublicBookingHours() {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/public-booking/hours`, { headers: authHeaders });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not load opening hours.');
@@ -291,18 +308,21 @@ export default function App() {
   }
 
   async function savePublicBookingHours(hours: Record<string, { closed: boolean; open: string; close: string }>) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/public-booking/hours`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save opening hours.');
   }
 
   async function savePublicBookingTimezone(timezone: string) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/public-booking/timezone`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ timezone }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save the business time zone.');
   }
 
   async function getPublicBookingClosedDates() {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/public-booking/closed-dates`, { headers: authHeaders });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not load closed dates.');
@@ -310,12 +330,14 @@ export default function App() {
   }
 
   async function savePublicBookingClosedDates(dates: string[]) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/public-booking/closed-dates`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ dates }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save closed dates.');
   }
 
   async function addInvoice(input: { customerId: string; description: string; items: InvoiceLineItem[]; amount: number; taxRate: number; dueDate: string }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/invoices`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this invoice.');
@@ -325,6 +347,7 @@ export default function App() {
   }
 
   async function addCampaign(input: { name: string; channel: string; message: string }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/campaigns`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this draft.');
@@ -332,12 +355,14 @@ export default function App() {
   }
 
   async function deleteCampaign(id: string) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/campaigns/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders });
     if (!response.ok) { const result = await response.json(); throw new Error(result.error ?? 'Could not delete this draft.'); }
     setCampaigns(current => current.filter(campaign => campaign.id !== id));
   }
 
   async function updateCampaign(id: string, input: { name: string; channel: string; message: string }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/campaigns/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not update this draft.');
@@ -345,6 +370,7 @@ export default function App() {
   }
 
   async function addExpense(input: { description: string; category: string; amount: number; spentAt: string }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/expenses`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this expense.');
@@ -352,6 +378,7 @@ export default function App() {
   }
 
   async function addInventoryItem(input: Omit<InventoryItem, 'id' | 'createdAt'>) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/inventory`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this product.');
@@ -359,6 +386,7 @@ export default function App() {
   }
 
   async function updateInventoryStock(id: string, quantity: number) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/inventory/${encodeURIComponent(id)}/stock`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ quantity }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not update stock.');
@@ -366,6 +394,7 @@ export default function App() {
   }
 
   async function addService(input: { name: string; description: string; durationMinutes: number; price: number }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/services`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not save this service.');
@@ -373,6 +402,7 @@ export default function App() {
   }
 
   async function updateService(id: string, input: { name: string; description: string; durationMinutes: number; price: number }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/services/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not update this service.');
@@ -380,12 +410,14 @@ export default function App() {
   }
 
   async function removeService(id: string) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/services/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders });
     if (!response.ok) { const result = await response.json(); throw new Error(result.error ?? 'Could not remove this service.'); }
     setServices(current => current.filter(service => service.id !== id));
   }
 
   async function addPayment(input: { invoiceId: string; amount: number; method: Payment['method'] }) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/payments`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not record this payment.');
@@ -398,6 +430,7 @@ export default function App() {
   }
 
   async function createPaymentLink(invoiceId: string) {
+    if (demoMode) throw demoReadOnly();
     const response = await fetch(`${apiBase}/api/payments/link`, { method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not create this payment link.');
@@ -457,16 +490,16 @@ export default function App() {
     return [
       ...overdueInvoices.map(invoice => ({ section: 'Payments' as const, title: `Payment overdue · ${invoice.invoiceNumber}`, detail: `${invoice.customerName} · ${formatCurrency(invoice.amount - invoice.paidAmount)} outstanding` })),
       ...pendingAppointments.map(appointment => ({ section: 'Appointments' as const, title: `Confirm appointment · ${appointment.customer}`, detail: `${appointment.service} · ${new Date(appointment.startsAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}` })),
-      ...(businessType === 'boutique' && subscription?.features?.lowStockAlerts ? inventoryItems.filter(item => item.quantity <= item.lowStockAt).map(item => ({ section: 'Inventory' as const, title: `Low stock · ${item.name}`, detail: `${item.size || 'No size'} · ${item.color || 'No color'} · ${item.quantity} left` })) : []),
+      ...(businessType === 'boutique' && (demoMode || subscription?.features?.lowStockAlerts) ? inventoryItems.filter(item => item.quantity <= item.lowStockAt).map(item => ({ section: 'Inventory' as const, title: `Low stock · ${item.name}`, detail: `${item.size || 'No size'} · ${item.color || 'No color'} · ${item.quantity} left` })) : []),
     ].slice(0, 8);
   }, [invoices, appointments, inventoryItems, businessType, alertsEnabled, subscription?.features?.lowStockAlerts, today.getTime()]);
 
-  if (import.meta.env.PROD && !supabase) return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-mark">BP</div><strong>Setup required</strong></div><h1>BizPilot is temporarily unavailable</h1><p className="auth-intro">The secure account connection is not configured. Please contact the business owner or try again later.</p></section></main>;
-  if (supabase && !authReady) return <main className="auth-screen"><section className="auth-card">Loading your account…</section></main>;
-  if (supabase && !session) return <AuthPage client={supabase}/>;
-  if ((supabase && backendDataMode !== 'supabase') || (!supabase && backendDataMode === 'supabase')) return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-mark">BP</div><strong>Supabase setup needed</strong></div><h1>Finish connecting BizPilot</h1><p className="auth-intro">The frontend and API must both be configured for the same Supabase project. Check both environment files, restart the dev server, and confirm the database schema was applied.</p><button className="auth-submit" onClick={() => void supabase?.auth.signOut()}>Sign out</button></section></main>;
+  if (!demoMode && import.meta.env.PROD && !supabase) return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-mark">BP</div><strong>Setup required</strong></div><h1>BizPilot is temporarily unavailable</h1><p className="auth-intro">The secure account connection is not configured. Please contact the business owner or try again later.</p></section></main>;
+  if (!demoMode && supabase && !authReady) return <main className="auth-screen"><section className="auth-card">Loading your account…</section></main>;
+  if (!demoMode && supabase && !session) return <AuthPage client={supabase}/>;
+  if (!demoMode && ((supabase && backendDataMode !== 'supabase') || (!supabase && backendDataMode === 'supabase'))) return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><div className="brand-mark">BP</div><strong>Supabase setup needed</strong></div><h1>Finish connecting BizPilot</h1><p className="auth-intro">The frontend and API must both be configured for the same Supabase project. Check both environment files, restart the dev server, and confirm the database schema was applied.</p><button className="auth-submit" onClick={() => void supabase?.auth.signOut()}>Sign out</button></section></main>;
 
-  return <div className="app-shell">{newBookingAlert && <div className="booking-arrival-toast" role="status"><span><strong>New booking request</strong><small>{newBookingAlert.customer} · {newBookingAlert.service} · {new Date(newBookingAlert.startsAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</small></span><button onClick={() => { setActive('Appointments'); setNewBookingAlert(null); }}>View appointment</button><button aria-label="Dismiss new booking alert" onClick={() => setNewBookingAlert(null)}>×</button></div>}<Sidebar active={active} onNavigate={setActive} businessName={businessName} businessInitial={businessInitial} businessType={businessType}/><main className="main-area"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-separator">/</span><strong>{active}</strong></div><div className="topbar-actions"><span className={`api-status ${apiOnline ? 'online' : apiOnline === false ? 'offline' : ''}`} title="Local API health"><i/>{apiOnline ? 'API connected' : apiOnline === false ? 'API unavailable' : 'Checking API'}</span><button aria-label="Search records" className="icon-button top-search" aria-expanded={globalSearchOpen} onClick={() => { setGlobalSearchOpen(open => !open); setGlobalSearchQuery(''); }}><Search size={18}/></button><div className="notifications-wrap"><button aria-label="Notifications" className="icon-button notification-button" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(open => !open)}><Bell size={18}/>{notifications.length > 0 && <i/>}</button>{notificationsOpen && <section className="notifications-panel" aria-label="Notifications"><div className="notifications-heading"><strong>Needs your attention</strong><span>{notifications.length}</span></div>{notifications.length ? <div className="notifications-list">{notifications.map((item, index) => <button key={`${item.title}-${index}`} onClick={() => { setActive(item.section); setNotificationsOpen(false); }}><strong>{item.title}</strong><span>{item.detail}</span></button>)}</div> : <p className="notifications-empty">You’re all caught up. No overdue payments or pending appointments.</p>}</section>}</div>{supabase && <button aria-label="Sign out" title="Sign out" className="icon-button" onClick={() => void supabase?.auth.signOut()}><LogOut size={17}/></button>}<span className="top-divider"/><ActionMenu label="Open business menu" heading={businessName} description="Current business workspace" triggerClassName="top-business" className="top-business-menu" items={[{ label: 'Business profile', description: 'Edit business and owner details', icon: <Building2 size={16}/>, onSelect: () => setActive('Business Profile') }, { label: 'Go to dashboard', description: 'View today’s business summary', icon: <LayoutDashboard size={16}/>, onSelect: () => setActive('Home') }]} trigger={<><div className="shop-avatar small">{businessInitial}</div><span>{businessName}</span><ChevronDown size={15}/></>}/></div>{globalSearchOpen && <section className="global-search-panel" aria-label="Search your business records"><div className="global-search-input"><Search size={16}/><input autoFocus value={globalSearchQuery} onChange={event => setGlobalSearchQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setGlobalSearchOpen(false); }} placeholder="Search customers, products, appointments, invoices…"/><button aria-label="Close search" onClick={() => setGlobalSearchOpen(false)}>×</button></div>{globalSearchQuery.trim() ? globalSearchResults.length ? <div className="global-search-results">{globalSearchResults.map((item, index) => <button key={`${item.section}-${item.title}-${index}`} onClick={() => { setActive(item.section); setGlobalSearchOpen(false); }}><span><strong>{item.title}</strong><small>{item.detail}</small></span><em>{item.section}</em></button>)}</div> : <p className="global-search-empty">No matching records found.</p> : <p className="global-search-empty">Search customers, products, appointments, invoices, payments, and expenses.</p>}</section>}</header><div className={`content-area ${active === 'Billing' ? 'billing-content' : ''}`}><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading page"><span className="visually-hidden">Loading page</span><i/><i/><i/></div>}>
+  return <div className="app-shell">{newBookingAlert && <div className="booking-arrival-toast" role="status"><span><strong>New booking request</strong><small>{newBookingAlert.customer} · {newBookingAlert.service} · {new Date(newBookingAlert.startsAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</small></span><button onClick={() => { setActive('Appointments'); setNewBookingAlert(null); }}>View appointment</button><button aria-label="Dismiss new booking alert" onClick={() => setNewBookingAlert(null)}>×</button></div>}<Sidebar active={active} onNavigate={setActive} businessName={businessName} businessInitial={businessInitial} businessType={businessType}/><main className="main-area"><header className="topbar"><div className="breadcrumb"><span>Workspace</span><span className="crumb-separator">/</span><strong>{active}</strong></div><div className="topbar-actions">{demoMode ? <span className="api-status"><i/>Demo data</span> : <span className={`api-status ${apiOnline ? 'online' : apiOnline === false ? 'offline' : ''}`} title="Local API health"><i/>{apiOnline ? 'API connected' : apiOnline === false ? 'API unavailable' : 'Checking API'}</span>}<button aria-label="Search records" className="icon-button top-search" aria-expanded={globalSearchOpen} onClick={() => { setGlobalSearchOpen(open => !open); setGlobalSearchQuery(''); }}><Search size={18}/></button><div className="notifications-wrap"><button aria-label="Notifications" className="icon-button notification-button" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(open => !open)}><Bell size={18}/>{notifications.length > 0 && <i/>}</button>{notificationsOpen && <section className="notifications-panel" aria-label="Notifications"><div className="notifications-heading"><strong>Needs your attention</strong><span>{notifications.length}</span></div>{notifications.length ? <div className="notifications-list">{notifications.map((item, index) => <button key={`${item.title}-${index}`} onClick={() => { setActive(item.section); setNotificationsOpen(false); }}><strong>{item.title}</strong><span>{item.detail}</span></button>)}</div> : <p className="notifications-empty">You’re all caught up. No overdue payments or pending appointments.</p>}</section>}</div>{!demoMode && supabase && <button aria-label="Sign out" title="Sign out" className="icon-button" onClick={() => void supabase?.auth.signOut()}><LogOut size={17}/></button>}<span className="top-divider"/><ActionMenu label="Open business menu" heading={businessName} description="Current business workspace" triggerClassName="top-business" className="top-business-menu" items={[{ label: 'Business profile', description: 'Edit business and owner details', icon: <Building2 size={16}/>, onSelect: () => setActive('Business Profile') }, { label: 'Go to dashboard', description: 'View today’s business summary', icon: <LayoutDashboard size={16}/>, onSelect: () => setActive('Home') }]} trigger={<><div className="shop-avatar small">{businessInitial}</div><span>{businessName}</span><ChevronDown size={15}/></>}/></div>{globalSearchOpen && <section className="global-search-panel" aria-label="Search your business records"><div className="global-search-input"><Search size={16}/><input autoFocus value={globalSearchQuery} onChange={event => setGlobalSearchQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') setGlobalSearchOpen(false); }} placeholder="Search customers, products, appointments, invoices…"/><button aria-label="Close search" onClick={() => setGlobalSearchOpen(false)}>×</button></div>{globalSearchQuery.trim() ? globalSearchResults.length ? <div className="global-search-results">{globalSearchResults.map((item, index) => <button key={`${item.section}-${item.title}-${index}`} onClick={() => { setActive(item.section); setGlobalSearchOpen(false); }}><span><strong>{item.title}</strong><small>{item.detail}</small></span><em>{item.section}</em></button>)}</div> : <p className="global-search-empty">No matching records found.</p> : <p className="global-search-empty">Search customers, products, appointments, invoices, payments, and expenses.</p>}</section>}</header>{demoMode && <div role="status" style={{ padding: '9px 16px', background: '#17376b', borderBottom: '1px solid #31548c', color: '#eaf1ff', textAlign: 'center', fontSize: 12 }}><strong>DEMO PREVIEW</strong> · Fictional boutique records · read only · no live account data</div>}<div className={`content-area ${active === 'Billing' ? 'billing-content' : ''}`}><Suspense fallback={<div className="page-loading" role="status" aria-label="Loading page"><span className="visually-hidden">Loading page</span><i/><i/><i/></div>}>
     {active === 'Help Centre' ? <HelpCentrePage onNavigate={setActive}/> : active === 'Business Profile' ? <BusinessProfilePage businessName={businessName} fullName={accountName} currencyCode={currencyCode} businessType={businessType} location={businessLocation} onSave={saveBusinessProfile}/> : active === 'Settings' ? <AppSettingsPage defaultPage={defaultPage} onDefaultPageChange={saveDefaultPage} alertsEnabled={alertsEnabled} onAlertsChange={saveAlertsEnabled} accountEmail={session?.user.email ?? ''} onOpenBusinessProfile={() => setActive('Business Profile')} onUpdatePassword={supabase && session ? updateAccountPassword : undefined} onDeleteAccount={supabase && session ? deleteAccount : undefined} subscription={subscription} subscriptionLoading={subscriptionLoading} subscriptionNotice={new URLSearchParams(window.location.search).get('subscription') === 'success' ? 'Checkout completed. Your plan will update as soon as Stripe confirms it.' : ''} onChooseSubscription={openSubscriptionCheckout} onManageSubscription={openSubscriptionPortal}/> : active === 'Inventory' ? <InventoryPage items={inventoryItems} onCreate={addInventoryItem} onStockChange={updateInventoryStock} isPro={subscription?.plan === 'pro'} variantLimit={subscription?.features?.inventoryVariantLimit ?? null} lowStockAlertsEnabled={subscription?.features?.lowStockAlerts ?? true} onUpgrade={() => setActive('Settings')}/> : active === 'Home' ? <><div className="page-heading"><div><div className="eyebrow">{dateLabel} <span>·</span> YOUR WORKSPACE</div><h1>Good morning, {firstName}</h1><p>Here’s what’s happening with your business today.</p></div><div className="quick-actions-wrap"><button className="primary-button" aria-haspopup="menu" aria-expanded={quickActionsOpen} onClick={() => setQuickActionsOpen(open => !open)}><Plus size={17}/> Quick action <ChevronDown size={15}/></button>{quickActionsOpen && <div className="quick-actions-menu" role="menu" aria-label="Quick actions">{([{ label: 'Customers', detail: 'Add or find a customer', icon: <UsersRound size={16}/> }, { label: 'Appointments', detail: 'Book a time slot', icon: <CalendarDays size={16}/> }, { label: 'Billing', detail: 'Create an invoice', icon: <FileText size={16}/> }, { label: 'Payments', detail: 'Record a payment', icon: <CreditCard size={16}/> }, { label: 'Expenses', detail: 'Log a business expense', icon: <ReceiptText size={16}/> }] as const).map(item => <button key={item.label} role="menuitem" onClick={() => { setActive(item.label); setQuickActionsOpen(false); }}><span className="quick-actions-icon">{item.icon}</span><span><strong>{item.label}</strong><small>{item.detail}</small></span></button>)}</div>}</div></div><div className="metrics-grid">{metrics.map(metric => <MetricCard key={metric.label} metric={metric}/>)}</div><div className="dashboard-grid"><div className="dashboard-main"><AppointmentList appointments={todaysAppointments} onViewAll={() => setActive('Appointments')}/><CustomerList customers={customersWithActivity} onViewAll={() => setActive('Customers')}/></div><BriefCard customers={customersWithActivity} appointments={todaysAppointments} invoices={openInvoices} onNavigate={setActive}/></div><SalesOverview payments={currentWeekPayments}/><section className="financial-snapshot" aria-label="This month’s cash summary"><div className="financial-snapshot-heading"><div><strong>This month’s cash</strong><span>Based on payments and expenses you’ve recorded</span></div><button className="text-button" onClick={() => setActive('Expenses')}>View expenses <span>↗</span></button></div><div className="financial-snapshot-grid"><div><span>Payments received</span><strong>{formatCurrency(paidThisMonth)}</strong></div><div><span>Expenses recorded</span><strong>{formatCurrency(expenseTotalThisMonth)}</strong></div><div className={cashAfterExpenses < 0 ? 'negative' : 'positive'}><span>Remaining after expenses</span><strong>{formatCurrency(cashAfterExpenses)}</strong></div></div></section><footer className="dashboard-footer"><span><Clock3 size={13}/> Based on your saved records</span><span>BizPilot preview <span className="footer-dot">·</span> Your business, running smoothly</span><nav aria-label="Legal pages"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer></> : active === 'Services' ? <ServicePage services={services} onCreate={addService} onUpdate={updateService} onRemove={removeService}/> : active === 'Appointments' ? <AppointmentPage businessName={businessName} customers={customersWithActivity} appointments={appointments} services={services} onCreate={addAppointment} onStatusChange={updateAppointmentStatus} onReschedule={rescheduleAppointment} onGetBookingPage={getPublicBookingPage} onGetBookingHours={getPublicBookingHours} onSaveBookingHours={savePublicBookingHours} onSaveBookingTimezone={savePublicBookingTimezone} onGetClosedDates={getPublicBookingClosedDates} onSaveClosedDates={savePublicBookingClosedDates} prefillCustomerId={bookingCustomerId} onPrefillHandled={() => setBookingCustomerId(null)}/> : active === 'Billing' ? <InvoicePage businessName={businessName} businessLocation={businessLocation} customers={customersWithActivity} invoices={invoices} services={services} inventory={inventoryItems} onCreate={addInvoice} prefillCustomerId={invoiceCustomerId} onPrefillHandled={() => setInvoiceCustomerId(null)}/> : active === 'Marketing' ? <MarketingPage campaigns={campaigns} onCreate={addCampaign} onUpdate={updateCampaign} onDelete={deleteCampaign}/> : active === 'Reports' ? <ReportsPage payments={payments} expenses={expenses} customers={customersWithActivity} appointments={appointments} invoices={invoices} inventory={inventoryItems} detailedReportsEnabled={subscription?.features?.detailedSalesAndProfitReports ?? true} onUpgrade={() => setActive('Settings')}/> : active === 'Expenses' ? <ExpensePage expenses={expenses} onCreate={addExpense}/> : active === 'Payments' ? <PaymentPage businessName={businessName} invoices={invoices} payments={payments} onCreate={addPayment} onCreatePaymentLink={createPaymentLink} apiBase={apiBase} authToken={session?.access_token ?? ''} businessCountry={businessLocation.country} prefillInvoiceId={paymentInvoiceId} onPrefillHandled={() => setPaymentInvoiceId(null)}/> : <SectionPage section={active} customers={customersWithActivity} appointments={appointments} invoices={invoices} payments={payments} apiBase={apiBase} authToken={session?.access_token} onAddCustomer={addCustomer} onUpdateCustomer={updateCustomer} onBookAppointment={customerId => { setBookingCustomerId(customerId); setActive('Appointments'); }} onCreateInvoice={customerId => { setInvoiceCustomerId(customerId); setActive('Billing'); }} onRecordPayment={invoiceId => { setPaymentInvoiceId(invoiceId); setActive('Payments'); }} onNavigate={setActive}/>}
     </Suspense></div></main></div>;
 }
