@@ -21,17 +21,22 @@ import { sanitizeSubmittedValues } from './inputSafety.js';
 
 export const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.disable('etag');
 const allowedOrigins = new Set((process.env.CORS_ORIGIN ?? (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5173'))
   .split(',').map(origin => origin.trim()).filter(Boolean));
 // Capacitor's local WebView origins for the packaged iOS and Android apps.
 allowedOrigins.add('capacitor://localhost');
 allowedOrigins.add('http://localhost');
-app.use((_request, response, next) => {
+app.use((request, response, next) => {
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  response.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+  if (process.env.NODE_ENV === 'production') response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (request.path.startsWith('/api/')) response.setHeader('Cache-Control', 'no-store');
   next();
 });
 app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)) }));
@@ -53,9 +58,9 @@ app.use('/api', (request, response, next) => {
   }
   next();
 });
-app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }), handleRazorpayWebhook);
-app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeConnectWebhook);
-app.post('/api/subscription/stripe/webhook', express.raw({ type: 'application/json' }), handleBizPilotSubscriptionWebhook);
+app.post('/api/payments/razorpay/webhook', express.raw({ type: 'application/json', limit: '64kb' }), handleRazorpayWebhook);
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '64kb' }), handleStripeConnectWebhook);
+app.post('/api/subscription/stripe/webhook', express.raw({ type: 'application/json', limit: '64kb' }), handleBizPilotSubscriptionWebhook);
 app.use(express.json({ limit: '64kb', strict: true }));
 app.use((request, response, next) => {
   if (request.body === undefined) return next();
@@ -145,6 +150,13 @@ app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
   const recentRequests = (aiRequestTimes.get(identity) ?? []).filter(time => currentTime - time < 60_000);
   if (recentRequests.length >= 10) { response.status(429).json({ error: 'Please wait a minute before asking another question.' }); return; }
   aiRequestTimes.set(identity, [...recentRequests, currentTime]);
+  if (aiRequestTimes.size > 5_000) {
+    for (const [key, times] of aiRequestTimes) {
+      const fresh = times.filter(time => currentTime - time < 60_000);
+      if (fresh.length) aiRequestTimes.set(key, fresh); else aiRequestTimes.delete(key);
+    }
+    while (aiRequestTimes.size > 5_000) aiRequestTimes.delete(aiRequestTimes.keys().next().value as string);
+  }
 
   const priorTurns = Array.isArray(history) ? history.slice(-6).flatMap((turn: unknown) => {
     if (!turn || typeof turn !== 'object') return [];

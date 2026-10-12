@@ -14,7 +14,9 @@ export async function businessAuth(request: Request, response: Response, next: N
     return next();
   }
   const authorization = request.header('authorization');
-  if (!authorization?.startsWith('Bearer ')) return response.status(401).json({ error: 'Please sign in to continue.' });
+  if (!authorization?.startsWith('Bearer ') || authorization.length > 8_200 || !authorization.slice(7).trim()) {
+    return response.status(401).json({ error: 'Please sign in to continue.' });
+  }
   try {
     const client = createClient(url!, anonKey!, { global: { headers: { Authorization: authorization } }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     const { data: { user }, error } = await client.auth.getUser(authorization.slice('Bearer '.length));
