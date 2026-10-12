@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'BizPilot',
   webDir: 'frontend/dist',
   server: {
-    androidScheme: 'http',
+    // Use a secure local origin so Android WebView treats the app as a secure context.
+    androidScheme: 'https',
   },
 };
 
