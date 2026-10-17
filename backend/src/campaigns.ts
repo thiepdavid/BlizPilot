@@ -11,7 +11,7 @@ async function readStore(): Promise<CampaignRecord[]> {
 export async function listCampaigns() { return (await readStore()).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
 export async function createCampaign(input: { name: string; channel: string; message: string }): Promise<CampaignRecord> {
   let created!: CampaignRecord;
-  const task = pendingWrite.then(async () => { const campaigns = await readStore(); created = { id: crypto.randomUUID(), businessId: 'demo-business', ...input, status: 'draft', createdAt: new Date().toISOString() }; await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, `${JSON.stringify([...campaigns, created], null, 2)}\n`, 'utf8'); });
+  const task = pendingWrite.then(async () => { const campaigns = await readStore(); created = { id: crypto.randomUUID(), businessId: 'local-business', ...input, status: 'draft', createdAt: new Date().toISOString() }; await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, `${JSON.stringify([...campaigns, created], null, 2)}\n`, 'utf8'); });
   pendingWrite = task.then(() => undefined, () => undefined); await task; return created;
 }
 

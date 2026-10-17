@@ -11,6 +11,6 @@ async function readStore(): Promise<ExpenseRecord[]> {
 export async function listExpenses() { return (await readStore()).sort((a, b) => b.spentAt.localeCompare(a.spentAt)); }
 export async function createExpense(input: { description: string; category: string; amount: number; spentAt: string }): Promise<ExpenseRecord> {
   let created!: ExpenseRecord;
-  const task = pendingWrite.then(async () => { const expenses = await readStore(); created = { id: crypto.randomUUID(), businessId: 'demo-business', ...input, createdAt: new Date().toISOString() }; await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, `${JSON.stringify([...expenses, created], null, 2)}\n`, 'utf8'); });
+  const task = pendingWrite.then(async () => { const expenses = await readStore(); created = { id: crypto.randomUUID(), businessId: 'local-business', ...input, createdAt: new Date().toISOString() }; await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, `${JSON.stringify([...expenses, created], null, 2)}\n`, 'utf8'); });
   pendingWrite = task.then(() => undefined, () => undefined); await task; return created;
 }

@@ -1,6 +1,6 @@
 # BizPilot
 
-BizPilot is a boutique-first business manager with a responsive React dashboard, an Express API, Supabase/PostgreSQL integration, and local demo storage. It supports products and variants, inventory, invoices, payments, expenses, customer records, and reports. The Daily Brief uses rules on saved business records. Ask BizPilot can answer questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or, when enabled, collected through the business owner's connected Stripe account. WhatsApp delivery is not connected.
+BizPilot is a boutique-first business manager with a responsive React dashboard, an Express API, Supabase/PostgreSQL integration, and local JSON storage. It supports products and variants, inventory, invoices, payments, expenses, customer records, and reports. The Daily Brief uses rules on saved business records. Ask BizPilot can answer questions with OpenAI using aggregate business totals; it does not send customer names, contact details, or private notes. Payments can be recorded manually or, when enabled, collected through the business owner's connected Stripe account. WhatsApp delivery is not connected.
 
 ## Project structure
 
@@ -54,7 +54,7 @@ This is only the native packaging foundation. Before store submission, configure
 
 - Node.js 22 or newer (required by the Capacitor mobile tooling)
 - npm 10 or newer
-- A Supabase project only if you want cloud storage and sign-in; demo mode can run without it
+- A Supabase project only if you want cloud storage and sign-in; local storage can be used without it
 
 ## Run locally
 
@@ -67,7 +67,7 @@ cp backend/.env.example backend/.env
 npm run dev
 ```
 
-Open <http://localhost:5173>. The Express API runs at <http://localhost:4000>; Vite proxies `/api` requests to it. Local demo records are stored as JSON under `backend/data/`.
+Open <http://localhost:5173>. The Express API runs at <http://localhost:4000>; Vite proxies `/api` requests to it. Local records are stored as JSON under `backend/data/` when Supabase is not configured.
 
 If you already have `.env` files with your own values, keep them and skip the corresponding `cp` command. Restart the development server after changing environment values.
 

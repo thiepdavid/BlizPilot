@@ -15,12 +15,7 @@ export interface CustomerRecord {
 }
 
 const filePath = resolve(dirname(fileURLToPath(import.meta.url)), '../data/customers.json');
-const seed: CustomerRecord[] = [
-  { id: 'demo-1', businessId: 'demo-business', name: 'Ananya Sharma', email: 'ananya.s@email.com', phone: '', notes: '', visits: 12, lastVisit: 'Today', createdAt: new Date().toISOString() },
-  { id: 'demo-2', businessId: 'demo-business', name: 'Rohan Mehta', email: 'rohan.m@email.com', phone: '', notes: '', visits: 8, lastVisit: 'Yesterday', createdAt: new Date().toISOString() },
-  { id: 'demo-3', businessId: 'demo-business', name: 'Priya Kapoor', email: 'priya.k@email.com', phone: '', notes: '', visits: 15, lastVisit: 'Sep 24', createdAt: new Date().toISOString() },
-  { id: 'demo-4', businessId: 'demo-business', name: 'Arjun Patel', email: 'arjun.p@email.com', phone: '', notes: '', visits: 3, lastVisit: 'Sep 22', createdAt: new Date().toISOString() },
-];
+const seed: CustomerRecord[] = [];
 let pendingWrite = Promise.resolve();
 
 async function readStore(): Promise<CustomerRecord[]> {
@@ -42,7 +37,7 @@ export async function createCustomer(input: Pick<CustomerRecord, 'name' | 'email
   let created!: CustomerRecord;
   pendingWrite = pendingWrite.then(async () => {
     const customers = await readStore();
-    created = { id: crypto.randomUUID(), businessId: 'demo-business', ...input, notes: input.notes ?? '', visits: 0, lastVisit: '—', createdAt: new Date().toISOString() };
+    created = { id: crypto.randomUUID(), businessId: 'local-business', ...input, notes: input.notes ?? '', visits: 0, lastVisit: '—', createdAt: new Date().toISOString() };
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify([...customers, created], null, 2)}\n`, 'utf8');
   });

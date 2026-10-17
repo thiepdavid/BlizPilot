@@ -14,7 +14,7 @@ export async function createInventoryItem(input: Omit<InventoryRecord, 'id' | 'b
   let created!: InventoryRecord;
   const task = pendingWrite.then(async () => { const rows = await readStore();
     if (input.sku && rows.some(row => row.sku.toLowerCase() === input.sku.toLowerCase())) throw new Error('That SKU is already in use.');
-    created = { id: crypto.randomUUID(), businessId: 'demo-business', ...input, createdAt: new Date().toISOString() };
+    created = { id: crypto.randomUUID(), businessId: 'local-business', ...input, createdAt: new Date().toISOString() };
     await mkdir(dirname(filePath), { recursive: true }); await writeFile(filePath, `${JSON.stringify([...rows, created], null, 2)}\n`, 'utf8');
   });
   pendingWrite = task.then(() => undefined, () => undefined); await task; return created;

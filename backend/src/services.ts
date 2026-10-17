@@ -14,7 +14,7 @@ export async function createService(input: { name: string; description: string; 
   let created!: ServiceRecord;
   const task = pendingWrite.then(async () => {
     const services = await readStore();
-    created = { id: crypto.randomUUID(), businessId: 'demo-business', ...input, isActive: true, createdAt: new Date().toISOString() };
+    created = { id: crypto.randomUUID(), businessId: 'local-business', ...input, isActive: true, createdAt: new Date().toISOString() };
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify([...services, created], null, 2)}\n`, 'utf8');
   });

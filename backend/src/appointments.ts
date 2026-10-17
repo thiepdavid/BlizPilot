@@ -16,13 +16,7 @@ export interface AppointmentRecord {
 }
 
 const filePath = resolve(dirname(fileURLToPath(import.meta.url)), '../data/appointments.json');
-const today = new Date();
-const at = (hour: number, minute: number) => { const date = new Date(today); date.setHours(hour, minute, 0, 0); return date.toISOString(); };
-const seed: AppointmentRecord[] = [
-  { id: 'sample-appt-1', businessId: 'demo-business', customerId: 'demo-1', customerName: 'Ananya Sharma', service: 'Haircut & styling', startsAt: at(9, 30), durationMinutes: 45, status: 'Completed', createdAt: new Date().toISOString() },
-  { id: 'sample-appt-2', businessId: 'demo-business', customerId: 'demo-2', customerName: 'Rohan Mehta', service: 'Beard trim', startsAt: at(10, 30), durationMinutes: 30, status: 'Confirmed', createdAt: new Date().toISOString() },
-  { id: 'sample-appt-3', businessId: 'demo-business', customerId: 'demo-3', customerName: 'Priya Kapoor', service: 'Hair colour', startsAt: at(11, 15), durationMinutes: 90, status: 'Confirmed', createdAt: new Date().toISOString() },
-];
+const seed: AppointmentRecord[] = [];
 let pendingWrite = Promise.resolve();
 const assertNoConflict = (appointments: AppointmentRecord[], startsAt: string, durationMinutes: number, skipId?: string) => {
   const start = new Date(startsAt).getTime(); const end = start + durationMinutes * 60_000;
