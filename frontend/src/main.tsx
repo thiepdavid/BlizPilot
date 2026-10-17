@@ -5,11 +5,14 @@ import './styles.css';
 
 const PublicBookingPage = lazy(() => import('./components/PublicBookingPage').then(module => ({ default: module.PublicBookingPage })));
 const LegalPage = lazy(() => import('./components/LegalPage').then(module => ({ default: module.LegalPage })));
+const AccountDeletionPage = lazy(() => import('./components/AccountDeletionPage').then(module => ({ default: module.AccountDeletionPage })));
 
 const bookingPath = window.location.pathname.match(/^\/book\/([^/]+)\/?$/);
 const legalPage = window.location.pathname.replace(/\/$/, '');
 const content = bookingPath
   ? <PublicBookingPage slug={decodeURIComponent(bookingPath[1])} apiBase={import.meta.env.VITE_API_URL ?? ''}/>
+  : legalPage === '/delete-account'
+    ? <AccountDeletionPage/>
   : legalPage === '/privacy' || legalPage === '/terms'
     ? <LegalPage page={legalPage === '/privacy' ? 'privacy' : 'terms'}/>
     : <App/>;
