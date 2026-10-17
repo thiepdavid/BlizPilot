@@ -1,5 +1,8 @@
 import { formatCurrency, getBusinessCurrencyCode, setBusinessCurrencyCode as storeCurrencyCode, supportedCurrencies, type CurrencyCode } from './lib/currency';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 import { Bell, Building2, CalendarDays, ChevronDown, Clock3, CreditCard, FileText, LayoutDashboard, LogOut, Plus, ReceiptText, Search, UsersRound } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { MetricCard } from './components/MetricCard';
@@ -103,6 +106,32 @@ export default function App() {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session)).catch(() => undefined).finally(() => setAuthReady(true));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setAuthReady(true); });
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !Capacitor.isNativePlatform()) return;
+    const authClient = supabase;
+    let disposed = false;
+    const finishOAuth = async (url: string) => {
+      let callback: URL;
+      try { callback = new URL(url); } catch { return; }
+      if (callback.protocol !== 'com.thiepdavidthiep.blizpilot:' || callback.hostname !== 'login-callback') return;
+      try {
+        const providerError = callback.searchParams.get('error_description') ?? callback.searchParams.get('error');
+        if (providerError) throw new Error(providerError);
+        const code = callback.searchParams.get('code');
+        if (!code) throw new Error('The sign-in provider returned an incomplete response. Please try again.');
+        const { error } = await authClient.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+      } catch (reason) {
+        if (!disposed) window.dispatchEvent(new CustomEvent('bizpilot-oauth-error', { detail: reason instanceof Error ? reason.message : 'Could not finish provider sign-in.' }));
+      } finally {
+        await Browser.close().catch(() => undefined);
+      }
+    };
+    const listener = CapacitorApp.addListener('appUrlOpen', event => { void finishOAuth(event.url); });
+    void CapacitorApp.getLaunchUrl().then(result => { if (result?.url) void finishOAuth(result.url); }).catch(() => undefined);
+    return () => { disposed = true; void listener.then(handle => handle.remove()); };
   }, []);
 
   useEffect(() => {
