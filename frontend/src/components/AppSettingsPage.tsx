@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Bell, Building2, CalendarDays, CreditCard, KeyRound, LayoutDashboard, PackageCheck, ShieldAlert, Settings2, ShieldCheck } from 'lucide-react';
+import { Bell, CalendarDays, CreditCard, KeyRound, LayoutDashboard, PackageCheck, ShieldAlert, Settings2, ShieldCheck } from 'lucide-react';
 import type { NavKey } from '../types';
 import type { SubscriptionInterval, SubscriptionSummary } from '../types/subscription';
 import './settings.css';
@@ -7,7 +7,7 @@ import './settings.css';
 const defaultPages: NavKey[] = ['Home', 'Customers', 'Services', 'Inventory', 'Appointments', 'Billing', 'Payments', 'Expenses', 'Reports', 'Marketing', 'AI'];
 export type AlertPreferences = { overdueInvoices: boolean; pendingAppointments: boolean; appointmentActivity: boolean; lowStock: boolean };
 
-export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnabled, onAlertsChange, alertPreferences, onAlertPreferencesChange, systemNotificationsEnabled, systemNotificationPermission, systemNotificationsAvailable, onEnableSystemNotifications, onBrowserNotificationsChange, accountEmail, onOpenBusinessProfile, onUpdatePassword, onDeleteAccount, onSignOutAllSessions, subscription, subscriptionLoading, subscriptionNotice, onChooseSubscription, onManageSubscription }: {
+export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnabled, onAlertsChange, alertPreferences, onAlertPreferencesChange, systemNotificationsEnabled, systemNotificationPermission, systemNotificationsAvailable, onEnableSystemNotifications, onBrowserNotificationsChange, accountEmail, onUpdatePassword, onDeleteAccount, onSignOutAllSessions, subscription, subscriptionLoading, subscriptionNotice, onChooseSubscription, onManageSubscription }: {
   defaultPage: NavKey;
   onDefaultPageChange: (page: NavKey) => void;
   alertsEnabled: boolean;
@@ -20,7 +20,6 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
   onEnableSystemNotifications: () => Promise<void>;
   onBrowserNotificationsChange: (enabled: boolean) => void;
   accountEmail: string;
-  onOpenBusinessProfile: () => void;
   onUpdatePassword?: (password: string) => Promise<void>;
   onDeleteAccount?: () => Promise<void>;
   onSignOutAllSessions?: () => Promise<void>;
@@ -137,11 +136,6 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
       {subscription && !subscription.canManage && <p className="subscription-note">Ask the business owner to manage the subscription.</p>}
       {billingError && <p className="form-error" role="alert">{billingError}</p>}
     </section>}
-
-    <section className="panel settings-panel app-settings-panel">
-      <div className="settings-heading"><div className="settings-icon"><Building2 size={18}/></div><div><h2>Business profile</h2><p>Business name, owner, country, address, tax details, and currency.</p></div></div>
-      <button type="button" className="secondary-button" onClick={onOpenBusinessProfile}>Manage business profile</button>
-    </section>
 
     {accountEmail && <section className="panel settings-panel app-settings-panel">
       <div className="settings-heading"><div className="settings-icon"><KeyRound size={18}/></div><div><h2>Account and security</h2><p>Signed in as {accountEmail}</p></div></div>
