@@ -23,7 +23,7 @@ export async function businessAuth(request: Request, response: Response, next: N
     if (error || !user) return response.status(401).json({ error: 'Your session has expired. Please sign in again.' });
     const { data: membership, error: membershipError } = await client.from('business_users').select('business_id').eq('user_id', user.id).limit(1).maybeSingle();
     if (membershipError) throw membershipError;
-    if (!membership) return response.status(403).json({ error: 'No business workspace is linked to this account. Run the BizPilot database setup SQL, then sign up again.' });
+    if (!membership) return response.status(403).json({ error: 'No business workspace is linked to this account. Run the BlizPilot database setup SQL, then sign up again.' });
     (request as AuthenticatedRequest).businessContext = { client, userId: user.id, businessId: membership.business_id as string };
     next();
   } catch (error) {

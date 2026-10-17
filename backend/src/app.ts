@@ -86,7 +86,7 @@ app.post('/api/account/delete', async (request, response) => {
     response.status(401).json({ error: 'Sign in again before deleting your account.' }); return;
   }
   if (!serviceKey) {
-    response.status(503).json({ error: 'Account deletion is not configured yet. Contact BizPilot support.' }); return;
+    response.status(503).json({ error: 'Account deletion is not configured yet. Contact BlizPilot support.' }); return;
   }
 
   try {
@@ -102,17 +102,17 @@ app.post('/api/account/delete', async (request, response) => {
       if (cleanupError.message.includes('Transfer ownership of shared businesses')) {
         response.status(409).json({ error: 'Transfer ownership of any shared business first, then try deleting your account again.' }); return;
       }
-      response.status(503).json({ error: 'Account deletion is not ready in the database. Your account is still active; contact BizPilot support.' }); return;
+      response.status(503).json({ error: 'Account deletion is not ready in the database. Your account is still active; contact BlizPilot support.' }); return;
     }
     const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
     if (deleteError) {
       console.error('Supabase Auth account deletion failed:', deleteError.message);
-      response.status(502).json({ error: 'Your business data was removed, but the login account could not be deleted. Contact BizPilot support.' }); return;
+      response.status(502).json({ error: 'Your business data was removed, but the login account could not be deleted. Contact BlizPilot support.' }); return;
     }
     response.json({ deleted: true });
   } catch (error) {
     console.error('Account deletion request failed:', error);
-    response.status(500).json({ error: 'Could not complete account deletion. Contact BizPilot support.' });
+    response.status(500).json({ error: 'Could not complete account deletion. Contact BlizPilot support.' });
   }
 });
 
@@ -196,7 +196,7 @@ app.post('/api/ai/ask', businessAuth, async (request, response, next) => {
       signal: AbortSignal.timeout(30_000),
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna',
-        instructions: 'You are BizPilot, a practical assistant for a small service business anywhere in the world. Answer using the supplied aggregate business snapshot and conversation only. The snapshot intentionally excludes customer names, contact information, private notes, and individual records. Never claim to have seen those details. If the snapshot lacks information, say so plainly. Use the snapshot currencyCode for amounts, concise plain language, and give a clear next step when useful. Do not invent metrics or give tax, legal, medical, or investment advice.',
+        instructions: 'You are BlizPilot, a practical assistant for a small service business anywhere in the world. Answer using the supplied aggregate business snapshot and conversation only. The snapshot intentionally excludes customer names, contact information, private notes, and individual records. Never claim to have seen those details. If the snapshot lacks information, say so plainly. Use the snapshot currencyCode for amounts, concise plain language, and give a clear next step when useful. Do not invent metrics or give tax, legal, medical, or investment advice.',
         input: JSON.stringify({ businessSnapshot: snapshot, recentConversation: priorTurns, question: message.trim() }),
         max_output_tokens: 500,
       }),
@@ -723,7 +723,7 @@ app.use('/api/subscription', businessAuth);
 app.get('/api/subscription', async (request, response, next) => {
   try {
     const context = (request as AuthenticatedRequest).businessContext;
-    if (!context) { response.status(400).json({ error: 'BizPilot subscriptions require a signed-in business.' }); return; }
+    if (!context) { response.status(400).json({ error: 'BlizPilot subscriptions require a signed-in business.' }); return; }
     response.json(await getBizPilotSubscription(context));
   } catch (error) { next(error); }
 });
@@ -735,7 +735,7 @@ app.post('/api/subscription/checkout', async (request, response) => {
   }
   try {
     const context = (request as AuthenticatedRequest).businessContext;
-    if (!context) { response.status(400).json({ error: 'BizPilot subscriptions require a signed-in business.' }); return; }
+    if (!context) { response.status(400).json({ error: 'BlizPilot subscriptions require a signed-in business.' }); return; }
     response.json(await createBizPilotCheckout(context, interval));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not open subscription checkout.';
@@ -747,7 +747,7 @@ app.post('/api/subscription/checkout', async (request, response) => {
 app.post('/api/subscription/portal', async (request, response) => {
   try {
     const context = (request as AuthenticatedRequest).businessContext;
-    if (!context) { response.status(400).json({ error: 'BizPilot subscriptions require a signed-in business.' }); return; }
+    if (!context) { response.status(400).json({ error: 'BlizPilot subscriptions require a signed-in business.' }); return; }
     response.json(await createBizPilotPortal(context));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not open subscription management.';

@@ -29,7 +29,7 @@ const priceIds: Record<BillingInterval, () => string | undefined> = {
 
 function stripeSecret() {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) throw new Error('BizPilot subscriptions are not configured yet.');
+  if (!key) throw new Error('BlizPilot subscriptions are not configured yet.');
   return key;
 }
 
@@ -43,7 +43,7 @@ function adminClient() {
 function clientOrigin() {
   const origin = process.env.CLIENT_ORIGIN ?? process.env.CORS_ORIGIN?.split(',')[0];
   if (!origin || (!/^https:\/\//i.test(origin) && !/^http:\/\/localhost(?::\d+)?$/i.test(origin))) {
-    throw new Error('Set CLIENT_ORIGIN to the BizPilot website URL in the API environment.');
+    throw new Error('Set CLIENT_ORIGIN to the BlizPilot website URL in the API environment.');
   }
   return origin.replace(/\/$/, '');
 }
@@ -61,7 +61,7 @@ async function stripeRequest<T>(path: string, body?: URLSearchParams): Promise<T
   const payload = await response.json() as T & { error?: { message?: string } };
   if (!response.ok) {
     console.error(`Stripe Billing API error (${response.status}):`, payload.error?.message ?? response.statusText);
-    throw new Error('Stripe could not complete the subscription request. Check the BizPilot plan setup.');
+    throw new Error('Stripe could not complete the subscription request. Check the BlizPilot plan setup.');
   }
   return payload;
 }
@@ -70,7 +70,7 @@ async function requireBusinessOwner(context: BusinessContext) {
   const { data, error } = await context.client.from('businesses')
     .select('owner_id').eq('id', context.businessId).maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data || data.owner_id !== context.userId) throw new Error('Only the business owner can manage the BizPilot subscription.');
+  if (!data || data.owner_id !== context.userId) throw new Error('Only the business owner can manage the BlizPilot subscription.');
 }
 
 async function subscriptionRow(businessId: string) {
@@ -92,7 +92,7 @@ export async function assertCanCreateInventoryVariant(context: BusinessContext) 
     .select('id', { count: 'exact', head: true }).eq('business_id', context.businessId);
   if (error) throw new Error(error.message);
   if ((count ?? 0) >= FREE_INVENTORY_VARIANT_LIMIT) {
-    const limitError = new Error(`The Free plan includes up to ${FREE_INVENTORY_VARIANT_LIMIT} product variants. Upgrade to BizPilot Pro for unlimited variants.`);
+    const limitError = new Error(`The Free plan includes up to ${FREE_INVENTORY_VARIANT_LIMIT} product variants. Upgrade to BlizPilot Pro for unlimited variants.`);
     Object.assign(limitError, { code: 'PRO_FEATURE_REQUIRED' });
     throw limitError;
   }
@@ -107,14 +107,14 @@ async function getPrice(interval: BillingInterval) {
     product?: string | { name?: string };
   }>(`/prices/${encodeURIComponent(id)}?expand[]=product`);
   if (!price.active || price.recurring?.interval !== interval || price.unit_amount === null || !Number.isSafeInteger(price.unit_amount)) {
-    throw new Error(`The BizPilot ${interval === 'month' ? 'monthly' : 'yearly'} Pro price is not active or has the wrong billing interval.`);
+    throw new Error(`The BlizPilot ${interval === 'month' ? 'monthly' : 'yearly'} Pro price is not active or has the wrong billing interval.`);
   }
   const digits = new Intl.NumberFormat('en', { style: 'currency', currency: price.currency }).resolvedOptions().maximumFractionDigits ?? 2;
   return {
     key: interval === 'month' ? 'pro_monthly' : 'pro_yearly',
     name: 'Pro', interval, currency: price.currency.toUpperCase(),
     amount: price.unit_amount / (10 ** digits),
-    productName: typeof price.product === 'object' ? price.product.name ?? 'BizPilot Pro' : 'BizPilot Pro',
+    productName: typeof price.product === 'object' ? price.product.name ?? 'BlizPilot Pro' : 'BlizPilot Pro',
   };
 }
 
@@ -149,7 +149,7 @@ export async function getBizPilotSubscription(context: BusinessContext) {
 export async function createBizPilotCheckout(context: BusinessContext, interval: BillingInterval) {
   await requireBusinessOwner(context);
   const price = priceIds[interval]();
-  if (!price) throw new Error(`BizPilot Pro ${interval === 'month' ? 'monthly' : 'yearly'} pricing is not configured yet.`);
+  if (!price) throw new Error(`BlizPilot Pro ${interval === 'month' ? 'monthly' : 'yearly'} pricing is not configured yet.`);
   const prior = await subscriptionRow(context.businessId);
   if (prior && ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(prior.status)) {
     throw new Error('This business already has a subscription. Use Manage subscription to update it.');
@@ -179,7 +179,7 @@ export async function createBizPilotCheckout(context: BusinessContext, interval:
 export async function createBizPilotPortal(context: BusinessContext) {
   await requireBusinessOwner(context);
   const row = await subscriptionRow(context.businessId);
-  if (!row?.stripe_customer_id) throw new Error('No BizPilot subscription is linked to this business yet.');
+  if (!row?.stripe_customer_id) throw new Error('No BlizPilot subscription is linked to this business yet.');
   const session = await stripeRequest<{ url?: string }>('/billing_portal/sessions', new URLSearchParams({
     customer: row.stripe_customer_id,
     return_url: `${clientOrigin()}/?subscription=returned`,
@@ -190,7 +190,7 @@ export async function createBizPilotPortal(context: BusinessContext) {
 
 export async function handleBizPilotSubscriptionWebhook(request: Request, response: Response) {
   const secret = process.env.STRIPE_BIZPILOT_WEBHOOK_SECRET;
-  if (!secret) { response.status(503).json({ error: 'BizPilot subscription webhooks are not configured.' }); return; }
+  if (!secret) { response.status(503).json({ error: 'BlizPilot subscription webhooks are not configured.' }); return; }
   const body = Buffer.isBuffer(request.body) ? request.body : Buffer.from('');
   if (!verifyStripeSignature(body, request.header('stripe-signature') ?? '', secret)) {
     response.status(400).json({ error: 'Invalid Stripe webhook signature.' }); return;
@@ -212,7 +212,7 @@ export async function handleBizPilotSubscriptionWebhook(request: Request, respon
     : priceId && priceId === yearlyPriceId ? 'year' : null;
   if (!businessId || !/^[0-9a-f-]{36}$/i.test(businessId) || !customerId || !subscriptionId || !interval
     || !Number.isSafeInteger(event.created) || !Number.isSafeInteger(subscription.current_period_end)) {
-    response.status(400).json({ error: 'Subscription event is missing BizPilot plan details.' }); return;
+    response.status(400).json({ error: 'Subscription event is missing BlizPilot plan details.' }); return;
   }
   try {
     const { error } = await adminClient().rpc('sync_bizpilot_subscription', {
@@ -230,7 +230,7 @@ export async function handleBizPilotSubscriptionWebhook(request: Request, respon
     if (error) throw error;
     response.json({ received: true });
   } catch (error) {
-    console.error('BizPilot subscription event could not be recorded:', error instanceof Error ? error.message : error);
+    console.error('BlizPilot subscription event could not be recorded:', error instanceof Error ? error.message : error);
     response.status(500).json({ error: 'The subscription event could not yet be recorded.' });
   }
 }

@@ -20,7 +20,7 @@ function stripeSecret() {
 function clientOrigin() {
   const origin = process.env.CLIENT_ORIGIN ?? process.env.CORS_ORIGIN?.split(',')[0];
   if (!origin || (!/^https:\/\//i.test(origin) && !/^http:\/\/localhost(?::\d+)?$/i.test(origin))) {
-    throw new Error('Set CLIENT_ORIGIN to the BizPilot website URL in the API environment.');
+    throw new Error('Set CLIENT_ORIGIN to the BlizPilot website URL in the API environment.');
   }
   return origin.replace(/\/$/, '');
 }
@@ -137,7 +137,7 @@ export async function createStripePaymentLink(context: BusinessContext, invoiceI
     'line_items[0][price_data][currency]': currency,
     'line_items[0][price_data][unit_amount]': String(amount),
     'line_items[0][price_data][product_data][name]': `Invoice ${invoice.invoice_number}`,
-    'line_items[0][price_data][product_data][description]': String(invoice.description || 'BizPilot service invoice').slice(0, 500),
+    'line_items[0][price_data][product_data][description]': String(invoice.description || 'BlizPilot service invoice').slice(0, 500),
     client_reference_id: invoice.id,
     'metadata[bizpilot_invoice_id]': invoice.id,
     'metadata[bizpilot_business_id]': context.businessId,
@@ -206,6 +206,6 @@ export async function handleStripeConnectWebhook(request: Request, response: Res
     response.json({ received: true });
   } catch (error) {
     console.error('Stripe payment could not be recorded:', error instanceof Error ? error.message : error);
-    response.status(500).json({ error: 'Payment was verified but could not yet be added to BizPilot.' });
+    response.status(500).json({ error: 'Payment was verified but could not yet be added to BlizPilot.' });
   }
 }

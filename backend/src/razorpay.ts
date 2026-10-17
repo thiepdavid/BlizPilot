@@ -28,7 +28,7 @@ export async function createRazorpayPaymentLink(context: BusinessContext, invoic
     currency: 'INR',
     accept_partial: false,
     reference_id: `BP${randomUUID().replaceAll('-', '').slice(0, 32)}`,
-    description: `BizPilot invoice ${invoice.invoice_number}`,
+    description: `BlizPilot invoice ${invoice.invoice_number}`,
     customer: {
       name: customer?.full_name ?? 'Customer',
       ...(customer?.email ? { email: customer.email } : {}),
@@ -103,7 +103,7 @@ export async function handleRazorpayWebhook(request: Request, response: Response
   });
   if (error) {
     console.error('Razorpay payment could not be recorded:', error.message);
-    response.status(500).json({ error: 'Payment was verified but could not yet be added to BizPilot.' });
+    response.status(500).json({ error: 'Payment was verified but could not yet be added to BlizPilot.' });
     return;
   }
   response.json({ received: true });

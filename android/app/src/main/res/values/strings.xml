@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BizPilot</string>
-    <string name="title_activity_main">BizPilot</string>
+    <string name="app_name">BlizPilot</string>
+    <string name="title_activity_main">BlizPilot</string>
     <string name="package_name">com.thiepdavidthiep.blizpilot</string>
     <string name="custom_url_scheme">com.thiepdavidthiep.blizpilot</string>
 </resources>

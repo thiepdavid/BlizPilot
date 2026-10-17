@@ -173,7 +173,7 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
   const lastDate = today ? dateInDays(today, 90) : undefined;
 
   return <main className="public-booking-screen"><section className="public-booking-card">
-    <div className="public-booking-brand"><span><Store size={18}/></span><strong>BizPilot</strong></div>
+    <div className="public-booking-brand"><span><Store size={18}/></span><strong>BlizPilot</strong></div>
     {loading ? <p className="public-booking-status">Opening booking page…</p> : loadError ? <div className="public-booking-message"><h1>Booking page unavailable</h1><p>{loadError}</p></div> : requested ? <div className="public-booking-success"><CheckCircle2 size={42}/><h1>Request sent</h1><p>Your request for <strong>{requested.service}</strong> has been sent to {page?.businessName}. It is pending confirmation; the business will contact you.</p><div><CalendarDays size={16}/>{new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short', timeZone: page?.timezone }).format(new Date(requested.startsAt))}</div><button className="public-booking-submit" onClick={() => setRequested(null)}>Request another appointment</button></div> : <>
       <div className="public-booking-heading"><div className="public-booking-eyebrow">ONLINE APPOINTMENT REQUEST</div><h1>Book with {page?.businessName}</h1><p>Choose a service and a time during opening hours.</p></div>
       {!page?.services.length ? <div className="public-booking-message"><h2>No services available yet</h2><p>Please contact the business to arrange an appointment.</p></div> : <form className="public-booking-form" onSubmit={submit}>
@@ -192,6 +192,6 @@ export function PublicBookingPage({ slug, apiBase }: { slug: string; apiBase: st
         <button className="public-booking-submit" type="submit" disabled={saving || !serviceId || !requestedTime}>{saving ? 'Sending request…' : 'Request appointment'}</button>
       </form>}
     </>}
-    <footer className="public-booking-footer"><span>Powered by BizPilot</span><nav aria-label="Legal pages"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
+    <footer className="public-booking-footer"><span>Powered by BlizPilot</span><nav aria-label="Legal pages"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav></footer>
   </section></main>;
 }

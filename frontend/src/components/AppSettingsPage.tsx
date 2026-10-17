@@ -82,13 +82,13 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
   }
 
   return <>
-    <div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> SETTINGS</div><h1>Settings</h1><p>Choose how BizPilot behaves for you.</p></div></div>
+    <div className="page-heading section-heading"><div><div className="eyebrow">WORKSPACE <span>/</span> SETTINGS</div><h1>Settings</h1><p>Choose how BlizPilot behaves for you.</p></div></div>
 
     <section className="panel settings-panel app-settings-panel">
       <div className="settings-heading"><div className="settings-icon"><Settings2 size={18}/></div><div><h2>App preferences</h2><p>Your opening page and alerts are saved in this browser.</p></div></div>
       <div className="app-setting-row">
         <span className="app-setting-icon"><LayoutDashboard size={17}/></span>
-        <span className="app-setting-copy"><strong>Open this page at launch</strong><small>Choose which section opens when you start BizPilot.</small></span>
+        <span className="app-setting-copy"><strong>Open this page at launch</strong><small>Choose which section opens when you start BlizPilot.</small></span>
         <select aria-label="Default opening page" value={defaultPage} onChange={event => onDefaultPageChange(event.target.value as NavKey)}>{defaultPages.map(page => <option key={page} value={page}>{page}</option>)}</select>
       </div>
       <div className="app-setting-row">
@@ -118,15 +118,15 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
       </div>
       <div className="app-setting-row app-setting-subrow">
         <span className="app-setting-icon"><Bell size={17}/></span>
-        <span className="app-setting-copy"><strong>Browser notifications</strong><small>{systemNotificationsAvailable ? systemNotificationPermission === 'denied' ? 'Blocked by browser settings. Allow notifications for BizPilot in your browser.' : 'Show device notifications while BizPilot is open in this browser. Each member enables these on their own device.' : 'Remote notifications for the installed mobile app still need Apple/Google push setup. In-app alerts appear while it is open.'}</small></span>
+        <span className="app-setting-copy"><strong>Browser notifications</strong><small>{systemNotificationsAvailable ? systemNotificationPermission === 'denied' ? 'Blocked by browser settings. Allow notifications for BlizPilot in your browser.' : 'Show device notifications while BlizPilot is open in this browser. Each member enables these on their own device.' : 'Remote notifications for the installed mobile app still need Apple/Google push setup. In-app alerts appear while it is open.'}</small></span>
         {systemNotificationsAvailable && (systemNotificationsEnabled ? <button type="button" className="secondary-button" onClick={() => { onBrowserNotificationsChange(false); setNotificationPermissionError(''); }}>Turn off</button> : <button type="button" className="secondary-button" disabled={notificationPermissionBusy || systemNotificationPermission === 'denied'} onClick={() => void enableSystemNotifications()}>{notificationPermissionBusy ? 'Requesting…' : 'Enable'}</button>)}
       </div>
       {notificationPermissionError && <p className="form-error" role="alert">{notificationPermissionError}</p>}
     </section>
 
     {subscription && (subscription.configured || subscription.plan === 'pro' || subscription.hasBillingAccount) && <section className="panel settings-panel app-settings-panel subscription-panel" aria-labelledby="subscription-heading">
-      <div className="settings-heading"><div className="settings-icon"><CreditCard size={18}/></div><div><h2 id="subscription-heading">Plan and billing</h2><p>Manage the BizPilot subscription for this business. Customer invoice payments remain separate.</p></div></div>
-      <div className="subscription-current"><span>Current plan</span><strong>{subscription?.plan === 'pro' ? 'BizPilot Pro' : 'Free'}</strong><small>{subscriptionLoading ? 'Refreshing plan…' : subscription?.status && subscription.status !== 'free' ? `Status: ${subscription.status.replace(/_/g, ' ')}` : 'No paid subscription'}</small></div>
+      <div className="settings-heading"><div className="settings-icon"><CreditCard size={18}/></div><div><h2 id="subscription-heading">Plan and billing</h2><p>Manage the BlizPilot subscription for this business. Customer invoice payments remain separate.</p></div></div>
+      <div className="subscription-current"><span>Current plan</span><strong>{subscription?.plan === 'pro' ? 'BlizPilot Pro' : 'Free'}</strong><small>{subscriptionLoading ? 'Refreshing plan…' : subscription?.status && subscription.status !== 'free' ? `Status: ${subscription.status.replace(/_/g, ' ')}` : 'No paid subscription'}</small></div>
       {subscription?.configured && subscription.plan !== 'pro' && <p className="subscription-note">Free includes core sales, customer, and stock tracking with up to {subscription.features.inventoryVariantLimit ?? 50} product variants. Pro adds unlimited variants, low-stock alerts, and detailed sales and profit reports.</p>}
       {subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd && <p className="subscription-note">Pro access is scheduled to end on {new Date(subscription.currentPeriodEnd).toLocaleDateString()}.</p>}
       {subscriptionNotice && <p className="settings-success" role="status">{subscriptionNotice}</p>}
@@ -146,7 +146,7 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
       </form>)}
       {passwordMessage && <p className="settings-success" role="status">{passwordMessage}</p>}
       {onSignOutAllSessions && <div className="settings-session-control">
-        <div><strong><ShieldCheck size={15}/> Active sessions</strong><p>Sign out of BizPilot on this device and any other devices using your account.</p></div>
+        <div><strong><ShieldCheck size={15}/> Active sessions</strong><p>Sign out of BlizPilot on this device and any other devices using your account.</p></div>
         {!signOutEverywhereOpen ? <button type="button" className="secondary-button" onClick={() => { setSignOutEverywhereError(''); setSignOutEverywhereOpen(true); }}>Sign out everywhere</button> : <div className="settings-session-confirm"><p>You’ll need to sign in again on every device. Continue?</p><div className="settings-delete-actions"><button type="button" className="secondary-button" disabled={signOutEverywhereBusy} onClick={() => setSignOutEverywhereOpen(false)}>Cancel</button><button type="button" className="settings-delete-button" disabled={signOutEverywhereBusy} onClick={() => void signOutEverywhere()}>{signOutEverywhereBusy ? 'Signing out…' : 'Sign out everywhere'}</button></div></div>}
         {signOutEverywhereError && <p className="form-error" role="alert">{signOutEverywhereError}</p>}
       </div>}

@@ -19,7 +19,7 @@ const content = bookingPath
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Suspense fallback={<main className="loading-shell" role="status" aria-label="Loading BizPilot"><span className="visually-hidden">Loading BizPilot</span><div className="loading-topbar"/><div className="loading-content"><div className="loading-title"/><div className="loading-metrics">{Array.from({ length: 4 }, (_, index) => <i key={index}/>)}</div><div className="loading-main"><div><i/><i/></div><i/></div></div></main>}>
+    <Suspense fallback={<main className="loading-shell" role="status" aria-label="Loading BlizPilot"><span className="visually-hidden">Loading BlizPilot</span><div className="loading-topbar"/><div className="loading-content"><div className="loading-title"/><div className="loading-metrics">{Array.from({ length: 4 }, (_, index) => <i key={index}/>)}</div><div className="loading-main"><div><i/><i/></div><i/></div></div></main>}>
       {content}
     </Suspense>
   </React.StrictMode>,

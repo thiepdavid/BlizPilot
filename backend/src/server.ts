@@ -43,5 +43,5 @@ assertProductionSecurityConfig();
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => {
-  console.log(`BizPilot API listening on port ${port}`);
+  console.log(`BlizPilot API listening on port ${port}`);
 });
