@@ -1,20 +1,29 @@
 import { useState, type FormEvent } from 'react';
-import { Bell, Building2, CreditCard, KeyRound, LayoutDashboard, ShieldAlert, Settings2 } from 'lucide-react';
+import { Bell, Building2, CalendarDays, CreditCard, KeyRound, LayoutDashboard, PackageCheck, ShieldAlert, Settings2, ShieldCheck } from 'lucide-react';
 import type { NavKey } from '../types';
 import type { SubscriptionInterval, SubscriptionSummary } from '../types/subscription';
 import './settings.css';
 
 const defaultPages: NavKey[] = ['Home', 'Customers', 'Services', 'Inventory', 'Appointments', 'Billing', 'Payments', 'Expenses', 'Reports', 'Marketing', 'AI'];
+export type AlertPreferences = { overdueInvoices: boolean; pendingAppointments: boolean; appointmentActivity: boolean; lowStock: boolean };
 
-export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnabled, onAlertsChange, accountEmail, onOpenBusinessProfile, onUpdatePassword, onDeleteAccount, subscription, subscriptionLoading, subscriptionNotice, onChooseSubscription, onManageSubscription }: {
+export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnabled, onAlertsChange, alertPreferences, onAlertPreferencesChange, systemNotificationsEnabled, systemNotificationPermission, systemNotificationsAvailable, onEnableSystemNotifications, onBrowserNotificationsChange, accountEmail, onOpenBusinessProfile, onUpdatePassword, onDeleteAccount, onSignOutAllSessions, subscription, subscriptionLoading, subscriptionNotice, onChooseSubscription, onManageSubscription }: {
   defaultPage: NavKey;
   onDefaultPageChange: (page: NavKey) => void;
   alertsEnabled: boolean;
   onAlertsChange: (enabled: boolean) => void;
+  alertPreferences: AlertPreferences;
+  onAlertPreferencesChange: (preferences: AlertPreferences) => void;
+  systemNotificationsEnabled: boolean;
+  systemNotificationPermission: NotificationPermission | 'unsupported';
+  systemNotificationsAvailable: boolean;
+  onEnableSystemNotifications: () => Promise<void>;
+  onBrowserNotificationsChange: (enabled: boolean) => void;
   accountEmail: string;
   onOpenBusinessProfile: () => void;
   onUpdatePassword?: (password: string) => Promise<void>;
   onDeleteAccount?: () => Promise<void>;
+  onSignOutAllSessions?: () => Promise<void>;
   subscription?: SubscriptionSummary | null;
   subscriptionLoading?: boolean;
   subscriptionNotice?: string;
@@ -32,6 +41,29 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
   const [deleteError, setDeleteError] = useState('');
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState('');
+  const [signOutEverywhereOpen, setSignOutEverywhereOpen] = useState(false);
+  const [signOutEverywhereBusy, setSignOutEverywhereBusy] = useState(false);
+  const [signOutEverywhereError, setSignOutEverywhereError] = useState('');
+  const [notificationPermissionBusy, setNotificationPermissionBusy] = useState(false);
+  const [notificationPermissionError, setNotificationPermissionError] = useState('');
+
+  function setAlertPreference(key: keyof AlertPreferences, enabled: boolean) {
+    onAlertPreferencesChange({ ...alertPreferences, [key]: enabled });
+  }
+
+  async function signOutEverywhere() {
+    if (!onSignOutAllSessions) return;
+    setSignOutEverywhereBusy(true); setSignOutEverywhereError('');
+    try { await onSignOutAllSessions(); }
+    catch (reason) { setSignOutEverywhereError(reason instanceof Error ? reason.message : 'Could not sign out on other devices.'); setSignOutEverywhereBusy(false); }
+  }
+
+  async function enableSystemNotifications() {
+    setNotificationPermissionBusy(true); setNotificationPermissionError('');
+    try { await onEnableSystemNotifications(); }
+    catch (reason) { setNotificationPermissionError(reason instanceof Error ? reason.message : 'Could not enable browser notifications.'); }
+    finally { setNotificationPermissionBusy(false); }
+  }
 
   async function runBillingAction(action: () => Promise<void>) {
     setBillingBusy(true); setBillingError('');
@@ -62,9 +94,35 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
       </div>
       <div className="app-setting-row">
         <span className="app-setting-icon"><Bell size={17}/></span>
-        <span className="app-setting-copy"><strong>In-app alerts</strong><small>Show overdue invoices and pending bookings. Low-stock alerts are a Pro feature.</small></span>
+        <span className="app-setting-copy"><strong>In-app alerts</strong><small>Show appointment activity, pending bookings, overdue invoices, and available low-stock alerts.</small></span>
         <label className="settings-toggle"><input type="checkbox" checked={alertsEnabled} onChange={event => onAlertsChange(event.target.checked)} aria-label="Enable in-app alerts"/><span/></label>
       </div>
+      <div className="app-setting-row app-setting-subrow">
+        <span className="app-setting-icon"><CreditCard size={17}/></span>
+        <span className="app-setting-copy"><strong>Overdue invoices</strong><small>Show balances past their due date in Notifications.</small></span>
+        <label className="settings-toggle"><input type="checkbox" checked={alertPreferences.overdueInvoices} disabled={!alertsEnabled} onChange={event => setAlertPreference('overdueInvoices', event.target.checked)} aria-label="Show overdue invoice alerts"/><span/></label>
+      </div>
+      <div className="app-setting-row app-setting-subrow">
+        <span className="app-setting-icon"><CalendarDays size={17}/></span>
+        <span className="app-setting-copy"><strong>Pending appointments</strong><small>Show appointment requests that need confirmation.</small></span>
+        <label className="settings-toggle"><input type="checkbox" checked={alertPreferences.pendingAppointments} disabled={!alertsEnabled} onChange={event => setAlertPreference('pendingAppointments', event.target.checked)} aria-label="Show pending appointment alerts"/><span/></label>
+      </div>
+      <div className="app-setting-row app-setting-subrow">
+        <span className="app-setting-icon"><CalendarDays size={17}/></span>
+        <span className="app-setting-copy"><strong>New or updated appointments</strong><small>Alert each signed-in workspace member when an appointment is received or changed.</small></span>
+        <label className="settings-toggle"><input type="checkbox" checked={alertPreferences.appointmentActivity} disabled={!alertsEnabled} onChange={event => setAlertPreference('appointmentActivity', event.target.checked)} aria-label="Show new and updated appointment alerts"/><span/></label>
+      </div>
+      <div className="app-setting-row app-setting-subrow">
+        <span className="app-setting-icon"><PackageCheck size={17}/></span>
+        <span className="app-setting-copy"><strong>Low stock</strong><small>Show variants at or below their alert quantity when this feature is available on your plan.</small></span>
+        <label className="settings-toggle"><input type="checkbox" checked={alertPreferences.lowStock} disabled={!alertsEnabled} onChange={event => setAlertPreference('lowStock', event.target.checked)} aria-label="Show low-stock alerts"/><span/></label>
+      </div>
+      <div className="app-setting-row app-setting-subrow">
+        <span className="app-setting-icon"><Bell size={17}/></span>
+        <span className="app-setting-copy"><strong>Browser notifications</strong><small>{systemNotificationsAvailable ? systemNotificationPermission === 'denied' ? 'Blocked by browser settings. Allow notifications for BizPilot in your browser.' : 'Show device notifications while BizPilot is open in this browser. Each member enables these on their own device.' : 'Remote notifications for the installed mobile app still need Apple/Google push setup. In-app alerts appear while it is open.'}</small></span>
+        {systemNotificationsAvailable && (systemNotificationsEnabled ? <button type="button" className="secondary-button" onClick={() => { onBrowserNotificationsChange(false); setNotificationPermissionError(''); }}>Turn off</button> : <button type="button" className="secondary-button" disabled={notificationPermissionBusy || systemNotificationPermission === 'denied'} onClick={() => void enableSystemNotifications()}>{notificationPermissionBusy ? 'Requesting…' : 'Enable'}</button>)}
+      </div>
+      {notificationPermissionError && <p className="form-error" role="alert">{notificationPermissionError}</p>}
     </section>
 
     {subscription && (subscription.configured || subscription.plan === 'pro' || subscription.hasBillingAccount) && <section className="panel settings-panel app-settings-panel subscription-panel" aria-labelledby="subscription-heading">
@@ -93,6 +151,11 @@ export function AppSettingsPage({ defaultPage, onDefaultPageChange, alertsEnable
         <div className="settings-delete-actions"><button type="button" className="secondary-button" disabled={passwordSaving} onClick={() => { setPasswordOpen(false); setPassword(''); setPasswordError(''); }}>Cancel</button><button type="submit" className="primary-button" disabled={passwordSaving || password.length < 8}>{passwordSaving ? 'Saving…' : 'Update password'}</button></div>
       </form>)}
       {passwordMessage && <p className="settings-success" role="status">{passwordMessage}</p>}
+      {onSignOutAllSessions && <div className="settings-session-control">
+        <div><strong><ShieldCheck size={15}/> Active sessions</strong><p>Sign out of BizPilot on this device and any other devices using your account.</p></div>
+        {!signOutEverywhereOpen ? <button type="button" className="secondary-button" onClick={() => { setSignOutEverywhereError(''); setSignOutEverywhereOpen(true); }}>Sign out everywhere</button> : <div className="settings-session-confirm"><p>You’ll need to sign in again on every device. Continue?</p><div className="settings-delete-actions"><button type="button" className="secondary-button" disabled={signOutEverywhereBusy} onClick={() => setSignOutEverywhereOpen(false)}>Cancel</button><button type="button" className="settings-delete-button" disabled={signOutEverywhereBusy} onClick={() => void signOutEverywhere()}>{signOutEverywhereBusy ? 'Signing out…' : 'Sign out everywhere'}</button></div></div>}
+        {signOutEverywhereError && <p className="form-error" role="alert">{signOutEverywhereError}</p>}
+      </div>}
     </section>}
 
     {onDeleteAccount && <section className="panel settings-delete-panel" aria-labelledby="delete-account-heading">
