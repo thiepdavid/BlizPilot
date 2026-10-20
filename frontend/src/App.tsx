@@ -112,6 +112,28 @@ export default function App() {
   };
 
   useEffect(() => {
+    const closeOverlaysOnOutsidePress = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('.top-search, .global-search-panel')) setGlobalSearchOpen(false);
+      if (!target.closest('.notifications-wrap')) setNotificationsOpen(false);
+    };
+    const closeOverlaysOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setGlobalSearchOpen(false);
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOverlaysOnOutsidePress);
+    document.addEventListener('keydown', closeOverlaysOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOverlaysOnOutsidePress);
+      document.removeEventListener('keydown', closeOverlaysOnEscape);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!supabase) return;
     void supabase.auth.getSession().then(({ data }) => setSession(data.session)).catch(() => undefined).finally(() => setAuthReady(true));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); setAuthReady(true); });
