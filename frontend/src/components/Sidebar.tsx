@@ -12,8 +12,11 @@ const financeItems: { label: NavKey; icon: typeof LayoutDashboard }[] = [
 export function Sidebar({ active, onNavigate, businessType }: { active: NavKey; onNavigate: (key: NavKey) => void; businessType: BusinessType }) {
   const [open, setOpen] = useState(false);
   const navigate = (section: NavKey) => { onNavigate(section); setOpen(false); };
-  const visibleWorkspace = businessType === 'boutique' ? workspaceItems.filter(item => item.label !== 'Services' && item.label !== 'Appointments') : workspaceItems;
-  const renderItems = (items: typeof workspaceItems) => <nav>{items.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${active === label ? 'active' : ''}`} aria-current={active === label ? 'page' : undefined} onClick={() => navigate(label)}><Icon size={17}/><span>{label}</span>{label === 'AI' && <span className="new-tag">NEW</span>}</button>)}</nav>;
+  const visibleWorkspace = workspaceItems;
+  const workspaceLabel = (label: NavKey) => label === 'Inventory'
+    ? businessType === 'restaurant' ? 'Stock & menu' : businessType === 'salon' ? 'Products & supplies' : 'Products & stock'
+    : label === 'Services' && businessType === 'restaurant' ? 'Menu & services' : label;
+  const renderItems = (items: typeof workspaceItems) => <nav>{items.map(({ label, icon: Icon }) => <button key={label} className={`nav-item ${active === label ? 'active' : ''}`} aria-current={active === label ? 'page' : undefined} onClick={() => navigate(label)}><Icon size={17}/><span>{workspaceLabel(label)}</span>{label === 'AI' && <span className="new-tag">NEW</span>}</button>)}</nav>;
   const nav = <>
     <div className="brand-lockup"><div className="brand-mark"><Activity size={20} strokeWidth={2.5}/></div><div><strong>BlizPilot</strong><span>BUSINESS MANAGER</span></div></div>
     <div className="nav-group"><div className="nav-caption">WORKSPACE</div>{renderItems(visibleWorkspace)}</div>
