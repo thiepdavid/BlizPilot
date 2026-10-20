@@ -7,6 +7,23 @@ const PublicBookingPage = lazy(() => import('./components/PublicBookingPage').th
 const LegalPage = lazy(() => import('./components/LegalPage').then(module => ({ default: module.LegalPage })));
 const AccountDeletionPage = lazy(() => import('./components/AccountDeletionPage').then(module => ({ default: module.AccountDeletionPage })));
 
+function BrandLoadingScreen() {
+  return (
+    <main className="brand-loading-screen" role="status" aria-label="Loading BlizPilot">
+      <div className="brand-loading-content">
+        <span className="brand-loading-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+          </svg>
+        </span>
+        <span className="brand-loading-name">BlizPilot</span>
+        <span className="brand-loading-subtitle">BUSINESS MANAGER</span>
+        <span className="brand-loading-track" aria-hidden="true" />
+      </div>
+    </main>
+  );
+}
+
 const bookingPath = window.location.pathname.match(/^\/book\/([^/]+)\/?$/);
 const legalPage = window.location.pathname.replace(/\/$/, '');
 const content = bookingPath
@@ -19,7 +36,7 @@ const content = bookingPath
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Suspense fallback={<main className="loading-shell" role="status" aria-label="Loading BlizPilot"><span className="visually-hidden">Loading BlizPilot</span><div className="loading-topbar"/><div className="loading-content"><div className="loading-title"/><div className="loading-metrics">{Array.from({ length: 4 }, (_, index) => <i key={index}/>)}</div><div className="loading-main"><div><i/><i/></div><i/></div></div></main>}>
+    <Suspense fallback={<BrandLoadingScreen />}>
       {content}
     </Suspense>
   </React.StrictMode>,
