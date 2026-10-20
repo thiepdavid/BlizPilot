@@ -142,3 +142,4 @@ html{scroll-behavior:smooth}
 @keyframes page-loading-shimmer{to{background-position:-200% 0}}
 @media(max-width:620px){.page-loading{grid-template-columns:1fr;gap:10px}.page-loading i,.page-loading i:first-of-type{min-height:88px}}
 @media(prefers-reduced-motion:reduce){.page-loading i{animation:none}}
+:is([data-global-search-id]).global-search-target{animation:global-search-pulse 1.8s ease-out both;scroll-margin-top:100px}@keyframes global-search-pulse{0%,100%{box-shadow:inset 0 0 0 0 transparent}18%,72%{box-shadow:inset 0 0 0 2px #0057ff;background-color:rgba(0,87,255,.09)}}
